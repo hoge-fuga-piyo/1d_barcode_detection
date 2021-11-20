@@ -23,7 +23,6 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 # Sources
 ###############################
 set(PROJ_SHARED_DIR ${CMAKE_SOURCE_DIR}/src)
-
 file(GLOB PROJ_SHARED_SOURCE ${PROJ_SHARED_SOURCE}/*.cpp)
 file(GLOB PROJ_SHARED_INCLUDE ${PROJ_SHARED_SOURCE}/*.h ${PROJ_SHARED_SOURCE}/*.hpp)
 
