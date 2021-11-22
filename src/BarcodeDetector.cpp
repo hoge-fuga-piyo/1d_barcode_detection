@@ -19,10 +19,6 @@ cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
   //double threshold = cv::threshold(gray_image, binary_image, 175, 255, cv::THRESH_BINARY_INV);
   //std::cout << "threshold: " << threshold << std::endl;
 
-  //cv::imshow("gray", gray_image);
-  //cv::imshow("binary", binary_image);
-  //cv::waitKey(0);
-
   return binary_image;
 }
 
@@ -114,6 +110,87 @@ std::vector<cv::Point> BarcodeDetector::cutEdge(const std::vector<cv::Point>& co
   return cutted_contour;
 }
 
+std::vector<std::vector<cv::Point>> BarcodeDetector::getLines(const std::vector<cv::Point> contour) const {
+  if (contour.size() == 0) {
+    return std::vector<std::vector<cv::Point>>();
+  }
+
+  auto get_key = [](const cv::Point& point) {
+    return std::to_string(point.x) + "_" + std::to_string(point.y);
+  };
+
+  // 隣接する8近傍にラインが存在するかチェック。存在する場合はそのラインのindexを返す
+  auto neighborhood_index = [&](const cv::Point& point, const std::unordered_map<std::string, std::tuple<cv::Point, int>>& map) -> int {
+    for (int x_offset = -1; x_offset <= 1; x_offset++) {
+      for (int y_offset = -1; y_offset <= 1; y_offset++) {
+        if (x_offset == 0 && y_offset == 0) {
+          continue;
+        }
+        std::string key = std::to_string(point.x + x_offset) + "_" + std::to_string(point.y + y_offset);
+        if (map.count(key) > 0) {
+          return std::get<1>(map.at(key));
+        }
+      }
+    }
+    return -1;
+  };
+
+  int line_index = 1;
+  int new_line_point_num = 0;
+  std::unordered_map<std::string, std::tuple<cv::Point, int>> line_map;
+  line_map[get_key(contour.at(0))] = std::tuple(contour.at(0), line_index);
+  while (true) {
+    // 既存の線分に属する点をチェック
+    for (const cv::Point& point : contour) {
+
+      // 既に線分に所属済みのピクセル
+      if (line_map.count(get_key(point)) > 0) {
+        continue;
+      }
+
+      // まだ所属してないピクセル
+      int point_line_index = neighborhood_index(point, line_map);
+      if (point_line_index > 0) {
+        line_map[get_key(point)] = std::tuple(point, point_line_index);
+        new_line_point_num++;
+      }
+    }
+    
+    // 対象の線分への追加対象の点がもう存在しない
+    if (new_line_point_num == 0) {
+      // 全点が線に所属してたら処理終了
+      bool end_line_divid = true;
+      for (const cv::Point& point : contour) {
+        if (line_map.count(get_key(point)) == 0) {
+          end_line_divid = false;
+          break;
+        }
+      }
+      if (end_line_divid) {
+        break;
+      }
+
+      // まだ線分に所属してない点を新しい点を1つ選んで新しい線分に所属させる
+      line_index++;
+      for (const cv::Point& point : contour) {
+        if (line_map.count(get_key(point)) == 0) {
+          line_map[get_key(point)] = std::tuple(point, line_index);
+          break;
+        }
+      }
+    }
+    new_line_point_num = 0;
+  }
+
+  std::vector<std::vector<cv::Point>> lines(line_index, std::vector<cv::Point>());
+  for (auto itr = line_map.begin(); itr != line_map.end(); ++itr) {
+    std::tuple<cv::Point, int> value = itr->second;
+    lines[std::get<1>(value) - 1].push_back(std::get<0>(value));
+  }
+
+  return lines;
+}
+
 cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point>> lines, cv::Scalar color) const {
   cv::Mat dst_image = image.clone();
   for (const auto& line : lines) {
@@ -122,6 +199,17 @@ cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector
       dst_image.at<cv::Vec3b>(point.y, point.x)[1] = color[1];
       dst_image.at<cv::Vec3b>(point.y, point.x)[2] = color[2];
     }
+  }
+
+  return dst_image;
+}
+
+cv::Mat BarcodeDetector::drawLine(const cv::Mat& image, std::vector<cv::Point> line, cv::Scalar color) const {
+  cv::Mat dst_image = image.clone();
+  for (const auto& point : line) {
+    dst_image.at<cv::Vec3b>(point.y, point.x)[0] = color[0];
+    dst_image.at<cv::Vec3b>(point.y, point.x)[1] = color[1];
+    dst_image.at<cv::Vec3b>(point.y, point.x)[2] = color[2];
   }
 
   return dst_image;
@@ -160,11 +248,23 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
   //
   std::vector<std::vector<cv::Point>> cutted_contours;
   for (const auto& contour : barcode_contours) {
+    // 輪郭の端をカットして2本の線分にする
     const auto cutted_contour = cutEdge(contour);
     cutted_contours.push_back(cutted_contour);
+    std::vector<std::vector<cv::Point>> lines = getLines(cutted_contour);
+
+    cv::Mat cutted_draw_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), cutted_contour, cv::Scalar(255, 0, 255));
+    cv::imshow("cutted_single_line", cutted_draw_image);
+
+    for (const auto& line : lines) {
+      cv::Mat tmp_draw_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), line, cv::Scalar(0, 255, 255));
+      cv::imshow("line", tmp_draw_image);
+      cv::waitKey(0);
+    }
   }
 
-  cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), cutted_contours, cv::Scalar(255, 0, 0));
+
+  cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), cutted_contours, cv::Scalar(255, 255, 0));
   cv::imshow("contours3", draw_image3);
   cv::waitKey(0);
 }
