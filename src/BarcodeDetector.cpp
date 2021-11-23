@@ -239,27 +239,40 @@ std::vector<cv::Point2d> BarcodeDetector::samplingLine(const std::vector<cv::Poi
       return p1.x < p2.x;
     });
 
-    std::cout << line.size() << ", " << sorted_line.at(0).x << ", " << sorted_line.at(sorted_line.size() - 1).x << std::endl;
-
     int sampling_num = (sorted_line.at(sorted_line.size() - 1).x - sorted_line.at(0).x) / sampling_interval;
     for (int sampling_index = 0; sampling_index < sampling_num; sampling_index++) {
       std::vector<cv::Point> line_part;
       int min_x = sorted_line.at(0).x + sampling_interval * sampling_index;
       int max_x = min_x + sampling_interval;
-      //std::cout << "min: " << min_x << ", max: " << max_x << std::endl;
       for (const auto& point : sorted_line) {
         if (point.x >= min_x && point.x < max_x) {
-          //std::cout << point << std::endl;
           line_part.push_back(point);
         }
       }
 
       cv::Point2d sampling_point = sampling(line_part);
       sampling_points.push_back(sampling_point);
-      //std::cout << "samplint index: " << sampling_index << ", line part point num: " << line_part.size() << std::endl;
     }
   } else {
+    std::vector<cv::Point> sorted_line = line;
+    std::sort(sorted_line.begin(), sorted_line.end(), [](const cv::Point& p1, const cv::Point& p2) {
+      return p1.y < p2.y;
+    });
 
+    int sampling_num = (sorted_line.at(sorted_line.size() - 1).y - sorted_line.at(0).y) / sampling_interval;
+    for (int sampling_index = 0; sampling_index < sampling_num; sampling_index++) {
+      std::vector<cv::Point> line_part;
+      int min_y = sorted_line.at(0).y + sampling_interval * sampling_index;
+      int max_y = min_y + sampling_interval;
+      for (const auto& point : sorted_line) {
+        if (point.y >= min_y && point.y < max_y) {
+          line_part.push_back(point);
+        }
+      }
+
+      cv::Point2d sampling_point = sampling(line_part);
+      sampling_points.push_back(sampling_point);
+    }
   }
 
   return sampling_points;
@@ -318,6 +331,20 @@ cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector
   }
 
   return dst_image;
+}
+
+cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point2d>> lines, cv::Scalar color) const {
+  std::vector<std::vector<cv::Point>> tmp_lines;
+  for (const auto& line : lines) {
+    std::vector<cv::Point> tmp_line;
+    for (const auto& point : line) {
+      tmp_line.push_back(point);
+    }
+    std::cout << tmp_line.size() << std::endl;
+    tmp_lines.push_back(tmp_line);
+  }
+
+  return drawLines(image, tmp_lines, color);
 }
 
 cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector<std::vector<cv::Point>>> lines, cv::Scalar color) const {
@@ -386,6 +413,7 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
   //
   std::vector<std::vector<std::vector<cv::Point>>> lines;
   std::vector<std::vector<cv::Point>> cutted_contours;
+  std::vector<std::vector<cv::Point2d>> line_sampling_points;
   for (const auto& contour : barcode_contours) {
     // 輪郭の端をカットして2本の線分にする
     const auto cutted_contour = cutEdge(contour);
@@ -396,9 +424,10 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
     // 2本の線分をそれぞれサンプリングする
     for (const auto& line : single_bar_lines) {
       std::vector<cv::Point2d> sampling_points = samplingLine(line);
-      cv::Mat sampling_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), sampling_points, cv::Scalar(0, 0, 255));
-      cv::imshow("sampling", sampling_image);
-      cv::waitKey(0);
+      line_sampling_points.push_back(sampling_points);
+      //cv::Mat sampling_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), sampling_points, cv::Scalar(0, 0, 255));
+      //cv::imshow("sampling", sampling_image);
+      //cv::waitKey(0);
     }
 
     //cv::Mat cutted_draw_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), cutted_contour, cv::Scalar(255, 0, 255));
@@ -411,8 +440,11 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
     //}
   }
 
+  std::cout << line_sampling_points.size() << std::endl;
 
   cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), lines, cv::Scalar(255, 255, 0));
   cv::imshow("contours3", draw_image3);
+  cv::Mat sampling_line_image = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), line_sampling_points, cv::Scalar(0, 0, 255));
+  cv::imshow("sampling", sampling_line_image);
   cv::waitKey(0);
 }
