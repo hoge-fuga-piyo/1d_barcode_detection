@@ -20,11 +20,13 @@ private:
   std::vector<cv::Point2d> samplingLine(const std::vector<cv::Point>& line) const;
   cv::Point2d sampling(const std::vector<cv::Point>& line_part) const;
   std::tuple<Direction, int> getDirection(const std::vector<cv::Point>& line) const;
+  double lineDegree(const std::vector<cv::Point2d>& sampling_points) const;
 
   // for DEBUG
   cv::Mat drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point>> lines, cv::Scalar color) const;
   cv::Mat drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point2d>> lines, cv::Scalar color) const;
   cv::Mat drawLines(const cv::Mat& image, std::vector<std::vector<std::vector<cv::Point>>> lines, cv::Scalar color) const;
+  cv::Mat drawLines(const cv::Mat& image, std::vector<std::vector<std::vector<cv::Point2d>>> lines, cv::Scalar color) const;
   cv::Mat drawLine(const cv::Mat& image, std::vector<cv::Point> line, cv::Scalar color) const;
   cv::Mat drawLine(const cv::Mat& image, std::vector<cv::Point2d> line, cv::Scalar color) const;
 public:

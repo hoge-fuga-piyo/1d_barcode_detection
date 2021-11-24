@@ -1,4 +1,6 @@
 #include <algorithm>
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include "BarcodeDetector.h"
 
 cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
@@ -22,12 +24,11 @@ cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
 std::vector<std::vector<cv::Point>> BarcodeDetector::contoursDetection(const cv::Mat& binary_image) const {
   // 輪郭抽出
   std::vector<std::vector<cv::Point>> contours;
-  //cv::findContours(binary_image, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
-  cv::findContours(binary_image, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
+  cv::findContours(binary_image, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
+  //cv::findContours(binary_image, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
   return contours;
 }
-
 
 bool BarcodeDetector::isBarcodePart(const std::vector<cv::Point>& contour) const {
   const double k_th = 2.34;
@@ -224,8 +225,6 @@ std::vector<cv::Point2d> BarcodeDetector::samplingLine(const std::vector<cv::Poi
   Direction direction = std::get<0>(direction_tuple);
   int length = std::get<1>(direction_tuple);
 
-  //std::cout << length << std::endl;
-
   // サンプリングできないくらい線分が短ければサンプリングをあきらめる
   if (length/sampling_interval <= 2) {
     return std::vector<cv::Point2d>();
@@ -295,6 +294,10 @@ cv::Point2d BarcodeDetector::sampling(const std::vector<cv::Point>& line_part) c
 }
 
 std::tuple<BarcodeDetector::Direction, int> BarcodeDetector::getDirection(const std::vector<cv::Point>& line) const {
+  if (line.size() < 2) {
+    return std::tuple(Direction::Horizontal, 0);
+  }
+
   cv::Point max_x_point = *std::max_element(line.begin(), line.end(), [](const cv::Point& p1, const cv::Point& p2) {
     return p1.x < p2.x;
   });
@@ -320,6 +323,18 @@ std::tuple<BarcodeDetector::Direction, int> BarcodeDetector::getDirection(const 
   return std::tuple(direction, larger_length);
 }
 
+double BarcodeDetector::lineDegree(const std::vector<cv::Point2d>& sampling_points) const {
+  cv::Vec4f fitting_info;
+  cv::fitLine(sampling_points, fitting_info, cv::DIST_L2, 0, 0.01, 0.01);
+
+  cv::Point2d direction(fitting_info[0], fitting_info[1]);
+
+  double radian = std::acos(cv::Point2d(1.0, 0.0).dot(direction));
+  double degree = radian * 180.0 / M_PI;
+
+  return degree;
+}
+
 cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point>> lines, cv::Scalar color) const {
   cv::Mat dst_image = image.clone();
   for (const auto& line : lines) {
@@ -340,7 +355,6 @@ cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector
     for (const auto& point : line) {
       tmp_line.push_back(point);
     }
-    std::cout << tmp_line.size() << std::endl;
     tmp_lines.push_back(tmp_line);
   }
 
@@ -360,6 +374,23 @@ cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector
   }
 
   return dst_image;
+}
+
+cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector<std::vector<cv::Point2d>>> lines, cv::Scalar color) const {
+  std::vector<std::vector<std::vector<cv::Point>>> barcode_lines;
+  for (const auto& tmp_lines : lines) {
+    std::vector<std::vector<cv::Point>> tmp_bar_line;
+    for (const auto& line : tmp_lines) {
+      std::vector<cv::Point> tmp_line;
+      for (const auto& point : line) {
+        tmp_line.push_back(point);
+      }
+      tmp_bar_line.push_back(tmp_line);
+    }
+    barcode_lines.push_back(tmp_bar_line);
+  }
+
+  return drawLines(image, barcode_lines, color);
 }
 
 cv::Mat BarcodeDetector::drawLine(const cv::Mat& image, std::vector<cv::Point> line, cv::Scalar color) const {
@@ -393,7 +424,6 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
   cv::imshow("filtered", filtered_image);
 
   cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
-  //cv::drawContours(draw_image, contours, -1, cv::Scalar(0, 0, 255), -1);
   cv::drawContours(draw_image, contours, -1, cv::Scalar(0, 0, 255));
   cv::imshow("contours", draw_image);
 
@@ -411,24 +441,32 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
   //
   // Outer contour to line transformation
   //
-  std::vector<std::vector<std::vector<cv::Point>>> lines;
-  std::vector<std::vector<cv::Point>> cutted_contours;
-  std::vector<std::vector<cv::Point2d>> line_sampling_points;
+  std::vector<std::vector<std::vector<cv::Point>>> barcode_lines;
+  std::vector<std::vector<std::vector<cv::Point2d>>> barcode_sampling_points;
+  std::vector<double> degrees;
   for (const auto& contour : barcode_contours) {
     // 輪郭の端をカットして2本の線分にする
     const auto cutted_contour = cutEdge(contour);
-    cutted_contours.push_back(cutted_contour);
     std::vector<std::vector<cv::Point>> single_bar_lines = getBarcodeCandidateLines(cutted_contour);
-    lines.push_back(single_bar_lines);
+    barcode_lines.push_back(single_bar_lines);
 
     // 2本の線分をそれぞれサンプリングする
+    std::vector<std::vector<cv::Point2d>> single_bar_sampling_points;
+    std::vector<double> single_bar_line_degrees;
     for (const auto& line : single_bar_lines) {
       std::vector<cv::Point2d> sampling_points = samplingLine(line);
-      line_sampling_points.push_back(sampling_points);
-      //cv::Mat sampling_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), sampling_points, cv::Scalar(0, 0, 255));
-      //cv::imshow("sampling", sampling_image);
-      //cv::waitKey(0);
+      single_bar_sampling_points.push_back(sampling_points);
+      
+      // サンプリングした点群を直線にフィッティングさせてその直線との角度を求める
+      if (sampling_points.size() >= 2) {
+        double degree = lineDegree(sampling_points);
+        single_bar_line_degrees.push_back(degree);
+        std::cout << "degree: " << degree << std::endl;
+      } else {
+        single_bar_line_degrees.push_back(-1.0);
+      }
     }
+    barcode_sampling_points.push_back(single_bar_sampling_points);
 
     //cv::Mat cutted_draw_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), cutted_contour, cv::Scalar(255, 0, 255));
     //cv::imshow("cutted_single_line", cutted_draw_image);
@@ -438,13 +476,12 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
     //  cv::imshow("line", tmp_draw_image);
     //  cv::waitKey(0);
     //}
+
   }
 
-  std::cout << line_sampling_points.size() << std::endl;
-
-  cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), lines, cv::Scalar(255, 255, 0));
+  cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), barcode_lines, cv::Scalar(255, 255, 0));
   cv::imshow("contours3", draw_image3);
-  cv::Mat sampling_line_image = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), line_sampling_points, cv::Scalar(0, 0, 255));
+  cv::Mat sampling_line_image = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), barcode_sampling_points, cv::Scalar(0, 0, 255));
   cv::imshow("sampling", sampling_line_image);
   cv::waitKey(0);
 }
