@@ -461,23 +461,68 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
       if (sampling_points.size() >= 2) {
         double degree = lineDegree(sampling_points);
         single_bar_line_degrees.push_back(degree);
-        std::cout << "degree: " << degree << std::endl;
-      } else {
-        single_bar_line_degrees.push_back(-1.0);
       }
     }
     barcode_sampling_points.push_back(single_bar_sampling_points);
 
-    //cv::Mat cutted_draw_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), cutted_contour, cv::Scalar(255, 0, 255));
-    //cv::imshow("cutted_single_line", cutted_draw_image);
+    if (single_bar_line_degrees.size() > 0) {
+      double degree = (double)(single_bar_line_degrees.at(0) + single_bar_line_degrees.at(1)) / 2.0;
+      degrees.push_back(degree);
+      std::cout << "degree: " << degree << std::endl;
+    } else {
+      degrees.push_back(-1.0);
+    }
 
-    //for (const auto& line : single_bar_lines) {
-    //  cv::Mat tmp_draw_image = drawLine(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), line, cv::Scalar(0, 255, 255));
-    //  cv::imshow("line", tmp_draw_image);
-    //  cv::waitKey(0);
-    //}
+    // 2本の線分の成す角が一定以上なら弾いてもいいかも
+    // 20度以上 or 160度未満ならはじくてきな感じで 
 
   }
+
+  // PDF
+  std::array<int, 180> distribution;
+  std::fill(distribution.begin(), distribution.end(), 0);
+  for (const double degree : degrees) {
+    if (degree + std::numeric_limits<double>::epsilon() < 0.0) {
+      continue;
+    }
+
+    int floored_degree = static_cast<int>(std::floor(degree));
+    distribution[floored_degree]++;
+  }
+
+  for (int i = 0; i < 180; i++) {
+    std::cout << i << ": " << distribution[i] << std::endl;
+  }
+
+  // 確率密度が最も大きなところを選択
+  const int t = 4;
+  int dentist_degree = 0;
+  int dentist_degree_count = 0;
+  for (int i = 0; i <= 180 - t; i++) {
+    int degree_count = 0;
+    for (int j = i; j < i + 4; j++) {
+      degree_count += distribution[j];
+    }
+
+    if (dentist_degree_count < degree_count) {
+      dentist_degree_count = degree_count;
+      dentist_degree = i;
+    }
+  }
+
+  // バーコードの向き
+  double m_lambda = 0.0;
+  for (int i = dentist_degree; i < dentist_degree + t; i++) {
+    m_lambda += i * distribution[i];
+  }
+  m_lambda /= (double)dentist_degree_count;
+
+  std::cout << "index: " << dentist_degree << std::endl;
+  std::cout << "count: " << dentist_degree_count << std::endl;
+  std::cout << "m_lambda: " << m_lambda << std::endl;
+
+
+
 
   cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), barcode_lines, cv::Scalar(255, 255, 0));
   cv::imshow("contours3", draw_image3);
