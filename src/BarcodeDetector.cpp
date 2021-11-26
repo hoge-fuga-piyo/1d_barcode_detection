@@ -2,7 +2,8 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include "BarcodeDetector.h"
-#include "Bar.h"
+
+int BarcodeDetector::pdf_interval_t = 4;
 
 cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
   // ガウシアンフィルタでノイズ除去
@@ -30,6 +31,85 @@ std::vector<std::vector<cv::Point>> BarcodeDetector::contoursDetection(const cv:
   //cv::findContours(binary_image, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
   return contours;
+}
+
+double BarcodeDetector::barcodeAngleDetermine(const std::vector<Bar>& bars) const {
+  std::array<int, 180> angle_distribution{};
+  std::fill(angle_distribution.begin(), angle_distribution.end(), 0);
+  for (const Bar& bar : bars) {
+    if (!bar.isValid()) {
+      continue;
+    }
+
+    const int floored_degree = static_cast<int>(std::floor(bar.getDegree()));
+    angle_distribution[floored_degree]++;
+  }
+
+  for (int i = 0; i < 180; i++) {
+    std::cout << i << ": " << angle_distribution[i] << std::endl;
+  }
+
+  // 確率密度が最も大きなところを選択
+  int dentist_degree = 0;
+  int dentist_degree_count = 0;
+  for (int i = 0; i <= 180 - pdf_interval_t; i++) {
+    int degree_count = 0;
+    for (int j = i; j < i + 4; j++) {
+      degree_count += angle_distribution[j];
+    }
+
+    if (dentist_degree_count < degree_count) {
+      dentist_degree_count = degree_count;
+      dentist_degree = i;
+    }
+  }
+
+  // バーコードの向き
+  double m_lambda = 0.0;
+  for (int i = dentist_degree; i < dentist_degree + pdf_interval_t; i++) {
+    m_lambda += i * angle_distribution[i];
+  }
+  m_lambda /= (double)dentist_degree_count;
+
+  std::cout << "index: " << dentist_degree << std::endl;
+  std::cout << "count: " << dentist_degree_count << std::endl;
+
+  return m_lambda;
+}
+
+void BarcodeDetector::updateValidityWithAngle(std::vector<Bar>& bars, double degree) const {
+  double min_degree = degree - ((double)pdf_interval_t / 2.0);
+  double max_degree = degree + ((double)pdf_interval_t / 2.0);
+
+
+  for (Bar& bar : bars) {
+    if (!bar.isValid()) {
+      continue;
+    }
+
+    bool is_valid = false;
+    if (bar.getDegree() >= min_degree && bar.getDegree() <= max_degree) {
+      is_valid = true;
+    }
+
+    // 最小の許容角度が0度以下になった場合は+180度して、その角度より大きければ許容角度内とみなす
+    if (min_degree < 0.0) {
+      double min_degree2 = min_degree + 180.0;
+      if (bar.getDegree() >= min_degree2) {
+        is_valid = true;
+      }
+    }
+
+    // 最大の許容角度が180度以上になった場合は-180度して、その角度より小さければ許容角度内とみなす
+    if (max_degree > 180.0) {
+      double max_degree2 = max_degree - 180.0;
+      if (bar.getDegree() <= max_degree2) {
+        is_valid = true;
+      }
+    }
+
+    bar.setIsValid(is_valid);
+  }
 }
 
 cv::Mat BarcodeDetector::drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point>> lines, cv::Scalar color) const {
@@ -143,6 +223,7 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
   //
   // Outer contour to line transformation
   //
+  // 各バーを直線にフィッティングしてバーの角度を計算する
   for (Bar& bar : bars) {
     if (!bar.isValid()) {
       continue;
@@ -171,48 +252,23 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
   cv::Mat draw_image4 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_sampling_lines, cv::Scalar(0, 255, 255));
   cv::imshow("sampling_line", draw_image4);
 
-  // PDF
-  std::array<int, 180> degree_distribution{};
-  std::fill(degree_distribution.begin(), degree_distribution.end(), 0);
+  // バーコード全体の向きを決定する
+  double barcode_angle_degree = barcodeAngleDetermine(bars);
+  std::cout << "barcode angle: " << barcode_angle_degree << std::endl;
+
+  // バーコードの向きに合わないバーは無効にする
+  updateValidityWithAngle(bars, barcode_angle_degree);
+
+  std::vector<std::vector<cv::Point>> draw_barcode_contours;
   for (const Bar& bar : bars) {
     if (!bar.isValid()) {
       continue;
     }
 
-    const int floored_degree = static_cast<int>(std::floor(bar.getDegree()));
-    degree_distribution[floored_degree]++;
+    draw_barcode_contours.push_back(bar.getContour());
   }
-
-  for (int i = 0; i < 180; i++) {
-    std::cout << i << ": " << degree_distribution[i] << std::endl;
-  }
-
-  // 確率密度が最も大きなところを選択
-  const int t = 4;
-  int dentist_degree = 0;
-  int dentist_degree_count = 0;
-  for (int i = 0; i <= 180 - t; i++) {
-    int degree_count = 0;
-    for (int j = i; j < i + 4; j++) {
-      degree_count += degree_distribution[j];
-    }
-
-    if (dentist_degree_count < degree_count) {
-      dentist_degree_count = degree_count;
-      dentist_degree = i;
-    }
-  }
-
-  // バーコードの向き
-  double m_lambda = 0.0;
-  for (int i = dentist_degree; i < dentist_degree + t; i++) {
-    m_lambda += i * degree_distribution[i];
-  }
-  m_lambda /= (double)dentist_degree_count;
-
-  std::cout << "index: " << dentist_degree << std::endl;
-  std::cout << "count: " << dentist_degree_count << std::endl;
-  std::cout << "m_lambda: " << m_lambda << std::endl;
+  cv::Mat draw_image5 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_barcode_contours, cv::Scalar(255, 0, 255));
+  cv::imshow("angle", draw_image5);
 
   cv::waitKey(0);
 }

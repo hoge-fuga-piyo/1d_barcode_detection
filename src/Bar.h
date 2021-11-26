@@ -33,6 +33,7 @@ public:
   Bar(const std::vector<cv::Point>& contour);
 
   bool isValid() const;
+  void setIsValid(bool is_valid);
   double getDegree() const;
   void lineFitting();
 

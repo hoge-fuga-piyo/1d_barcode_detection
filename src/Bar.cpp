@@ -314,6 +314,10 @@ bool Bar::isValid() const {
   return is_valid;
 }
 
+void Bar::setIsValid(bool is_valid) {
+  this->is_valid = is_valid;
+}
+
 double Bar::getDegree() const {
   return degree;
 }
