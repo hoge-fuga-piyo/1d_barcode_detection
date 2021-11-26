@@ -25,6 +25,10 @@ private:
   std::vector<cv::Point2d> samplingLine(const std::vector<cv::Point>& line) const;
   double lineDegree(const std::vector<cv::Point2d>& sampling_points) const;
 
+  // for DEBUG
+  std::array<std::vector<cv::Point>, 2> lines;
+  std::array<std::vector<cv::Point2d>, 2> sampling_lines;
+
 public:
   Bar(const std::vector<cv::Point>& contour);
 
@@ -34,6 +38,8 @@ public:
 
   // for DEBUG
   std::vector<cv::Point> getContour() const;
+  std::array<std::vector<cv::Point>, 2> getLines() const;
+  std::array<std::vector<cv::Point2d>, 2> getSamplingLines() const;
 };
 
 #endif

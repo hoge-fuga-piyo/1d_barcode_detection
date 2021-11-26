@@ -12,6 +12,7 @@ cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
 
   // 大津の二値化で二値画像に変換
   // TODO: adaptiveThresholdで二値化した方が汎用性高いかも
+  // TODO: ガウシアンフィルタ -> 二値化 -> 輪郭抽出じゃなくて、DoGフィルタ -> 二値化 -> 輪郭抽出の方がいいかも。要検証
   cv::Mat gray_image;
   cv::cvtColor(gaussian_image, gray_image, cv::COLOR_BGR2GRAY);
   cv::Mat binary_image;
@@ -129,6 +130,7 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
     Bar bar = Bar(contour);
     bars.push_back(bar);
 
+    // for DEBUG
     if (bar.isValid()) {
       draw_contours.push_back(bar.getContour());
     }
@@ -147,6 +149,27 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
     }
     bar.lineFitting();
   }
+
+  std::vector<std::vector<cv::Point>> draw_lines;
+  std::vector<std::vector<cv::Point2d>> draw_sampling_lines;
+  for (const Bar& bar : bars) {
+    if (!bar.isValid()) {
+      continue;
+    }
+    // for DEBUG
+    const auto lines = bar.getLines();
+    for (const auto& line : lines) {
+      draw_lines.push_back(line);
+    }
+    const auto sampling_lines = bar.getSamplingLines();
+    for (const auto& line : sampling_lines) {
+      draw_sampling_lines.push_back(line);
+    }
+  }
+  cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_lines, cv::Scalar(255, 255, 0));
+  cv::imshow("line", draw_image3);
+  cv::Mat draw_image4 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_sampling_lines, cv::Scalar(0, 255, 255));
+  cv::imshow("sampling_line", draw_image4);
 
   // PDF
   std::array<int, 180> degree_distribution{};
@@ -191,9 +214,5 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
   std::cout << "count: " << dentist_degree_count << std::endl;
   std::cout << "m_lambda: " << m_lambda << std::endl;
 
-  //cv::Mat draw_image3 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), barcode_lines, cv::Scalar(255, 255, 0));
-  //cv::imshow("contours3", draw_image3);
-  //cv::Mat sampling_line_image = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), barcode_sampling_points, cv::Scalar(0, 0, 255));
-  //cv::imshow("sampling", sampling_line_image);
   cv::waitKey(0);
 }

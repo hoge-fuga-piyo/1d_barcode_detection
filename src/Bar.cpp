@@ -326,6 +326,7 @@ void Bar::lineFitting() {
     is_valid = false;
     return;
   }
+  this->lines = lines;
 
   // 2本の線分をそれぞれサンプリングする
   const int min_point_num = 2;  // TODO 要調整
@@ -339,6 +340,7 @@ void Bar::lineFitting() {
       return;
     }
   }
+  this->sampling_lines = sampling_lines;
 
   // サンプリングした点群を直線にフィッティングしてx軸との角度を求める
   std::array<double, 2> line_degrees{0.0, 0.0};
@@ -354,4 +356,12 @@ void Bar::lineFitting() {
 
 std::vector<cv::Point> Bar::getContour() const {
   return contour;
+}
+
+std::array<std::vector<cv::Point2d>, 2> Bar::getSamplingLines() const {
+  return sampling_lines;
+}
+
+std::array<std::vector<cv::Point>, 2> Bar::getLines() const {
+  return lines;
 }
