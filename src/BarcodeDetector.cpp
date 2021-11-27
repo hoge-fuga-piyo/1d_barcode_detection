@@ -196,6 +196,8 @@ void BarcodeDetector::updateValidityWithLength(std::vector<Bar>& bars, double le
   }
 }
 
+// バーコードの各バーは平行に並んでいるはずなので、あるバーと別のバーの重心を結んだベクトルはバーコードの方向とほぼ垂直になるはず
+// その特性を利用して、平行に並んでいるバーの数が最も多いもののみをバーとみなす
 void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars, double degree) const {
   double radian = degree * (M_PI / 180.0);
   cv::Mat rotation_mat = (cv::Mat_<double>(2, 2) << std::cos(radian), -std::sin(radian), std::sin(radian), std::cos(radian));
@@ -245,6 +247,42 @@ void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars, double degre
     }
 
     if (max_bar_index.count(i) == 0) {
+      bars[i].setIsValid(false);
+    }
+  }
+}
+
+// バーコードは隣り合うバーとの距離が近いはず
+// なので、あるバーと最も近いバーとの距離が一定以上大きければバーの一部とはみなさない
+// 具体的には、最も近いバーとの距離が、バーの長さ*閾値以上ならバーの一部とはみなさない
+void BarcodeDetector::removeSingleBar(std::vector<Bar>& bars) const {
+  const double ratio_threshold = 0.5;
+
+  for (uint i = 0; i < bars.size(); i++) {
+    if (!bars.at(i).isValid()) {
+      continue;
+    }
+
+    bool is_single = true;
+    int bar_length = bars.at(i).getBarLength();
+    cv::Vec2d bar_center = bars.at(i).getCenter();
+    for (uint j = 0; j < bars.size(); j++) {
+      if (!bars.at(j).isValid()) {
+        continue;
+      }
+      if (i == j) {
+        continue;
+      }
+
+      cv::Vec2d tmp_bar_center = bars.at(j).getCenter();
+      double distance = cv::norm(bar_center, tmp_bar_center);
+      if (bar_length * ratio_threshold > distance) {
+        is_single = false;
+        break;
+      }
+    }
+
+    if (is_single) {
       bars[i].setIsValid(false);
     }
   }
@@ -462,6 +500,11 @@ std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
 
   cv::Mat draw_image7 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(0, 255, 125));
   cv::imshow("direction", draw_image7);
+
+  // バーの近くに他のバーが存在しなければバーコードとはみなさない
+  removeSingleBar(bars);
+  cv::Mat draw_image8 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(255, 0, 125));
+  cv::imshow("nearest", draw_image8);
 
   // バーコードの領域を示す端の4点を返す
   std::array<cv::Point, 4> corner = getBarcodeCorner(bars);

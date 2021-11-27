@@ -6,11 +6,12 @@
 
 int main() {
 	//cv::Mat image = cv::imread("../../../data/test.jpg");
-	//cv::Mat image = cv::imread("../../../data/test2.jpg");
+	cv::Mat image = cv::imread("../../../data/test2.jpg");
 	//cv::Mat image = cv::imread("../../../data/test3.jpg");
 	//cv::Mat image = cv::imread("../../../data/test4.jpg");
 	//cv::Mat image = cv::imread("../../../data/test5.jpg");
-	cv::Mat image = cv::imread("../../../data/test6.jpg");
+	//cv::Mat image = cv::imread("../../../data/test6.jpg");
+	//cv::Mat image = cv::imread("../../../data/test11.jpg");
 
 	// バーコード検出
 	BarcodeDetector decoder;
@@ -39,13 +40,17 @@ int main() {
 	cv::barcode::BarcodeDetector default_barcode_detector;
 	std::vector<cv::Point2f> default_corner;
 	default_barcode_detector.detect(image, default_corner);
-	std::vector<std::string> default_decoded_info;
-	std::vector<cv::barcode::BarcodeType> default_decoded_type;
-	default_barcode_detector.decode(image, default_corner, default_decoded_info, default_decoded_type);
-	std::cout << "default barcode detector result" << std::endl;
-	for (uint i = 0; i < default_decoded_info.size(); i++) {
-		std::cout << default_decoded_info.at(i) << std::endl;
-		std::cout << default_decoded_type.at(i) << std::endl;
+	if (default_corner.size() < 4) {
+		std::cout << "default barcode detecter cannot find barcode" << std::endl;
+	} else {
+		std::vector<std::string> default_decoded_info;
+		std::vector<cv::barcode::BarcodeType> default_decoded_type;
+		default_barcode_detector.decode(image, default_corner, default_decoded_info, default_decoded_type);
+		std::cout << "default barcode detector result" << std::endl;
+		for (uint i = 0; i < default_decoded_info.size(); i++) {
+			std::cout << default_decoded_info.at(i) << std::endl;
+			std::cout << default_decoded_type.at(i) << std::endl;
+		}
 	}
 
 	return 0;

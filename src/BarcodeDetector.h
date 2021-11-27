@@ -21,6 +21,7 @@ private:
   double barcodeLengthDetermine(const std::vector<Bar>& bars) const;
   void updateValidityWithLength(std::vector<Bar>& bars, double length) const;
   void removeFewBarDirection(std::vector<Bar>& bars, double degree) const;
+  void removeSingleBar(std::vector<Bar>& bars) const;
   std::array<cv::Point, 4> getBarcodeCorner(std::vector<Bar>& bars) const;
 
   // for DEBUG
