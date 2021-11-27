@@ -30,6 +30,7 @@ private:
   cv::Mat drawLines(const cv::Mat& image, std::vector<std::vector<std::vector<cv::Point2d>>> lines, cv::Scalar color) const;
   cv::Mat drawLine(const cv::Mat& image, std::vector<cv::Point> line, cv::Scalar color) const;
   cv::Mat drawLine(const cv::Mat& image, std::vector<cv::Point2d> line, cv::Scalar color) const;
+  cv::Mat drawBars(const cv::Mat& image, const std::vector<Bar>& bars, cv::Scalar color) const;
 public:
   std::array<cv::Point, 4> detect(const cv::Mat& image) const;
 };

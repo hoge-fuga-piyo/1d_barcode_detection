@@ -345,6 +345,18 @@ cv::Mat BarcodeDetector::drawLine(const cv::Mat& image, std::vector<cv::Point2d>
   return drawLine(image, points, color);
 }
 
+cv::Mat BarcodeDetector::drawBars(const cv::Mat& image, const std::vector<Bar>& bars, cv::Scalar color) const {
+  std::vector<std::vector<cv::Point>> contours;
+  for (const Bar& bar : bars) {
+    if (!bar.isValid()) {
+      continue;
+    }
+    contours.push_back(bar.getContour());
+  }
+
+  return drawLines(image, contours, color);
+}
+
 std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
   //
   // Barcode Detection Method
@@ -414,14 +426,7 @@ std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
   // バーコードの向きに合わないバーは無効にする
   updateValidityWithAngle(bars, barcode_angle_degree);
 
-  std::vector<std::vector<cv::Point>> draw_barcode_contours;
-  for (const Bar& bar : bars) {
-    if (!bar.isValid()) {
-      continue;
-    }
-    draw_barcode_contours.push_back(bar.getContour());
-  }
-  cv::Mat draw_image5 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_barcode_contours, cv::Scalar(255, 0, 255));
+  cv::Mat draw_image5 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(255, 0, 255));
   cv::imshow("angle", draw_image5);
 
   // バーの長さが外れ値なものは無効にする
@@ -429,28 +434,14 @@ std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
   updateValidityWithLength(bars, bar_length);
   std::cout << "fixed length: " << bar_length << std::endl;
 
-  std::vector<std::vector<cv::Point>> draw_length_contours;
-  for (const Bar& bar : bars) {
-    if (!bar.isValid()) {
-      continue;
-    }
-    draw_length_contours.push_back(bar.getContour());
-  }
-  cv::Mat draw_image6 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_length_contours, cv::Scalar(125, 255, 0));
+  cv::Mat draw_image6 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(125, 255, 0));
   cv::imshow("length", draw_image6);
 
   // バーが平行に一定以上存在する部分のみをバーコードとみなす
   removeFewBarDirection(bars, barcode_angle_degree);
 
-  std::vector<std::vector<cv::Point>> draw_direction_contours;
-  for (const Bar& bar : bars) {
-    if (!bar.isValid()) {
-      continue;
-    }
-    draw_direction_contours.push_back(bar.getContour());
-  }
-  cv::Mat draw_image7 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_direction_contours, cv::Scalar(0, 255, 125));
-  cv::imshow("direction_", draw_image7);
+  cv::Mat draw_image7 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(0, 255, 125));
+  cv::imshow("direction", draw_image7);
 
   // バーコードの領域を示す端の4点を返す
   std::array<cv::Point, 4> corner = getBarcodeCorner(bars);

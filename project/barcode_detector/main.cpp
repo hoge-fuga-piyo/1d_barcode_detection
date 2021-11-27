@@ -13,7 +13,7 @@ int main() {
 	cv::Mat result_image = image.clone();
 	std::array<cv::Point, 4> corner = decoder.detect(image);
 	for (const auto& point : corner) {
-		cv::circle(result_image, point, 10, cv::Scalar(0, 0, 255), -1);
+		cv::circle(result_image, point, 5, cv::Scalar(0, 0, 255), -1);
 	}
 
 	cv::imshow("result", result_image);
