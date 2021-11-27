@@ -6,6 +6,8 @@
 Bar::Bar(const std::vector<cv::Point>& contour) {
   this->contour = contour;
   is_valid = isBarcodeElement();
+  corner = detectCorner(contour);
+  center = detectCenter(contour);
 }
 
 bool Bar::isBarcodeElement() {
@@ -19,6 +21,56 @@ bool Bar::isBarcodeElement() {
   }
 
   return false;
+}
+
+std::array<cv::Point, 4> Bar::detectCorner(const std::vector<cv::Point>& contour) const {
+  cv::Point max_x_point = *std::max_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.x < p2.x;
+  });
+
+  cv::Point min_x_point = *std::min_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.x < p2.x;
+  });
+
+  cv::Point max_y_point = *std::max_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.y < p2.y;
+  });
+
+  cv::Point min_y_point = *std::min_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.y < p2.y;
+  });
+
+  std::array<cv::Point, 4> corner;
+  corner[0] = cv::Point(min_x_point.x, min_y_point.y);
+  corner[1] = cv::Point(max_x_point.x, min_y_point.y);
+  corner[2] = cv::Point(min_x_point.x, max_y_point.y);
+  corner[3] = cv::Point(max_x_point.x, max_y_point.y);
+
+  return corner;
+}
+
+cv::Point2d Bar::detectCenter(const std::vector<cv::Point>& contour) const {
+  // バーは長方形のはずなので中点は重心と近似できるはず
+  cv::Point max_x_point = *std::max_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.x < p2.x;
+  });
+
+  cv::Point min_x_point = *std::min_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.x < p2.x;
+  });
+
+  cv::Point max_y_point = *std::max_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.y < p2.y;
+  });
+
+  cv::Point min_y_point = *std::min_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
+    return p1.y < p2.y;
+  });
+
+  double x = (double)(min_x_point.x + max_x_point.x) / 2.0;
+  double y = (double)(min_y_point.y + max_y_point.y) / 2.0;
+
+  return cv::Point2d(x, y);
 }
 
 double Bar::getDiagonalLength(const std::vector<cv::Point>& contour) const {
@@ -326,6 +378,14 @@ double Bar::getDegree() const {
 double Bar::getBarLength() const {
   // 長編の方が圧倒的に長いバーコード成分なら、バーの長さを対角線の長さで近似できるはず
   return getDiagonalLength(contour);
+}
+
+std::array<cv::Point, 4> Bar::getCorner() const {
+  return corner;
+}
+
+cv::Point2d Bar::getCenter() const {
+  return center;
 }
 
 void Bar::lineFitting() {
