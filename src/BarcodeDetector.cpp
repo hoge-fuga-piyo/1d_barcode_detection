@@ -7,20 +7,42 @@ int BarcodeDetector::pdf_interval_t = 4;
 double BarcodeDetector::pdf_length_ratio = 0.12;
 
 cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
-  // ガウシアンフィルタでノイズ除去
-  cv::Mat gaussian_image;
-  cv::GaussianBlur(image, gaussian_image, cv::Size(3, 3), 0, 0);
-  cv::imshow("gaussian", gaussian_image);
+  //// ガウシアンフィルタでノイズ除去
+  //cv::Mat gaussian_image;
+  //cv::GaussianBlur(image, gaussian_image, cv::Size(3, 3), 0, 0);
+  //cv::imshow("gaussian", gaussian_image);
 
-  // 大津の二値化で二値画像に変換
-  // TODO: adaptiveThresholdで二値化した方が汎用性高いかも
-  // TODO: ガウシアンフィルタ -> 二値化 -> 輪郭抽出じゃなくて、DoGフィルタ -> 二値化 -> 輪郭抽出の方がいいかも。要検証
+  //// 大津の二値化で二値画像に変換
+  //// TODO: adaptiveThresholdで二値化した方が汎用性高いかも
+  //// TODO: ガウシアンフィルタ -> 二値化 -> 輪郭抽出じゃなくて、DoGフィルタ -> 二値化 -> 輪郭抽出の方がいいかも。要検証
+  //cv::Mat gray_image;
+  //cv::cvtColor(gaussian_image, gray_image, cv::COLOR_BGR2GRAY);
+  //cv::Mat binary_image;
+  //double threshold = cv::threshold(gray_image, binary_image, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+  ////double threshold = cv::threshold(gray_image, binary_image, 175, 255, cv::THRESH_BINARY_INV);
+  ////std::cout << "threshold: " << threshold << std::endl;
+
+  //return binary_image;
+
+  // グレースケール変換
   cv::Mat gray_image;
-  cv::cvtColor(gaussian_image, gray_image, cv::COLOR_BGR2GRAY);
+  cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
+
+  // DoGフィルタ
+  cv::Mat gaussian_image1, gaussian_image2;
+  cv::GaussianBlur(gray_image, gaussian_image1, cv::Size(3, 3), 0, 0);
+  cv::GaussianBlur(gray_image, gaussian_image2, cv::Size(5, 5), 0, 0);
+  cv::Mat dog_image = gaussian_image1 - gaussian_image2;
+
+  // 二値化
   cv::Mat binary_image;
-  double threshold = cv::threshold(gray_image, binary_image, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-  //double threshold = cv::threshold(gray_image, binary_image, 175, 255, cv::THRESH_BINARY_INV);
-  //std::cout << "threshold: " << threshold << std::endl;
+  //double threshold = cv::threshold(dog_image, binary_image, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+  double threshold = cv::threshold(dog_image, binary_image, 4, 255, cv::THRESH_BINARY_INV);
+  std::cout << "binary threshold: " << threshold << std::endl;
+
+  //cv::imshow("dog", dog_image);
+  //cv::imshow("binary", binary_image);
+  //cv::waitKey(0);
 
   return binary_image;
 }
@@ -209,8 +231,6 @@ void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars, double degre
         bar_num++;
         bar_index[j] = true;
       }
-
-      std::cout << "diff radian: " << diff_degree << std::endl;
     }
 
     if (bar_num > max_bar_num) {
