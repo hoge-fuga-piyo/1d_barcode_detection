@@ -20,6 +20,8 @@ private:
   void updateValidityWithAngle(std::vector<Bar>& bars, double degree) const;
   double barcodeLengthDetermine(const std::vector<Bar>& bars) const;
   void updateValidityWithLength(std::vector<Bar>& bars, double length) const;
+  void removeFewBarCluster(std::vector<Bar>& bars, double degree) const;
+  std::array<cv::Point, 4> getBarcodeCorner(std::vector<Bar>& bars) const;
 
   // for DEBUG
   cv::Mat drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point>> lines, cv::Scalar color) const;
@@ -29,7 +31,7 @@ private:
   cv::Mat drawLine(const cv::Mat& image, std::vector<cv::Point> line, cv::Scalar color) const;
   cv::Mat drawLine(const cv::Mat& image, std::vector<cv::Point2d> line, cv::Scalar color) const;
 public:
-  void detect(const cv::Mat& image) const;
+  std::array<cv::Point, 4> detect(const cv::Mat& image) const;
 };
 
 #endif
