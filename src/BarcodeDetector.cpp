@@ -198,13 +198,7 @@ void BarcodeDetector::updateValidityWithLength(std::vector<Bar>& bars, double le
 
 // バーコードの各バーは平行に並んでいるはずなので、あるバーと別のバーの重心を結んだベクトルはバーコードの方向とほぼ垂直になるはず
 // その特性を利用して、平行に並んでいるバーの数が最も多いもののみをバーとみなす
-void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars, double degree) const {
-  double radian = degree * (M_PI / 180.0);
-  cv::Mat rotation_mat = (cv::Mat_<double>(2, 2) << std::cos(radian), -std::sin(radian), std::sin(radian), std::cos(radian));
-  cv::Mat barcode_direction_vec = rotation_mat * (cv::Mat_<double>(2, 1) << 1.0, 0.0);
-  std::cout << rotation_mat << std::endl;
-  std::cout << barcode_direction_vec << std::endl;
-
+void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars) const {
   const double degree_diff_threshold = 10.0;
   int max_bar_num = 0;
   std::unordered_map<int, bool> max_bar_index;
@@ -212,6 +206,9 @@ void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars, double degre
     if (!bars.at(i).isValid()) {
       continue;
     }
+    double radian = bars.at(i).getDegree() * (M_PI / 180.0);
+    cv::Mat rotation_mat = (cv::Mat_<double>(2, 2) << std::cos(radian), -std::sin(radian), std::sin(radian), std::cos(radian));
+    cv::Mat bar_direction_vec = rotation_mat * (cv::Mat_<double>(2, 1) << 1.0, 0.0);
 
     const cv::Point2d bar_center = bars.at(i).getCenter();
     int bar_num = 0;
@@ -220,13 +217,16 @@ void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars, double degre
       if (!bars.at(j).isValid()) {
         continue;
       }
+      if (i == j) {
+        continue;
+      }
 
       const cv::Point2d tmp_bar_center = bars.at(j).getCenter();
       const cv::Vec2d center_diff_vec = tmp_bar_center - bar_center;
       cv::Vec2d normalized_vec;
       cv::normalize(center_diff_vec, normalized_vec);
 
-      double diff_radian = std::acos(barcode_direction_vec.dot(normalized_vec));
+      double diff_radian = std::acos(bar_direction_vec.dot(normalized_vec));
       double diff_degree = diff_radian * (180.0 / M_PI);
 
       if (diff_degree > 90.0 - degree_diff_threshold && diff_degree < 90.0 + degree_diff_threshold) {
@@ -477,6 +477,12 @@ std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
   cv::Mat draw_image4 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_sampling_lines, cv::Scalar(0, 255, 255));
   cv::imshow("sampling_line", draw_image4);
 
+  // バーが平行に一定以上存在する部分のみをバーコードとみなす
+  removeFewBarDirection(bars);
+
+  cv::Mat draw_image7 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(0, 255, 125));
+  cv::imshow("direction", draw_image7);
+
   // バーコード全体の向きを決定する
   double barcode_angle_degree = barcodeAngleDetermine(bars);
   std::cout << "barcode angle: " << barcode_angle_degree << std::endl;
@@ -494,12 +500,6 @@ std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
 
   cv::Mat draw_image6 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(125, 255, 0));
   cv::imshow("length", draw_image6);
-
-  // バーが平行に一定以上存在する部分のみをバーコードとみなす
-  removeFewBarDirection(bars, barcode_angle_degree);
-
-  cv::Mat draw_image7 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(0, 255, 125));
-  cv::imshow("direction", draw_image7);
 
   // バーの近くに他のバーが存在しなければバーコードとはみなさない
   removeSingleBar(bars);

@@ -11,7 +11,7 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test4.jpg");
 	//cv::Mat image = cv::imread("../../../data/test5.jpg");
 	//cv::Mat image = cv::imread("../../../data/test6.jpg");
-	//cv::Mat image = cv::imread("../../../data/test11.jpg");
+	//cv::Mat image = cv::imread("../../../data/test13.jpg");
 
 	// バーコード検出
 	BarcodeDetector decoder;
