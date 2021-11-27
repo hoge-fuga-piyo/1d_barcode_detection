@@ -16,6 +16,7 @@ private:
 
   cv::Mat preprocessing(const cv::Mat& image) const;
   std::vector<std::vector<cv::Point>> contoursDetection(const cv::Mat& binary_image) const;
+  void removeShortContours(std::vector<Bar>& bars, double min_length) const;
   double barcodeAngleDetermine(const std::vector<Bar>& bars) const;
   void updateValidityWithAngle(std::vector<Bar>& bars, double degree) const;
   double barcodeLengthDetermine(const std::vector<Bar>& bars) const;

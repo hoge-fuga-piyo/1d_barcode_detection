@@ -27,6 +27,7 @@ cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
   // グレースケール変換
   cv::Mat gray_image;
   cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
+  cv::imshow("gray", gray_image);
 
   // DoGフィルタ
   cv::Mat gaussian_image1, gaussian_image2;
@@ -54,6 +55,17 @@ std::vector<std::vector<cv::Point>> BarcodeDetector::contoursDetection(const cv:
   //cv::findContours(binary_image, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_NONE);
 
   return contours;
+}
+
+void BarcodeDetector::removeShortContours(std::vector<Bar>& bars, double min_length) const {
+  for (Bar& bar : bars) {
+    if (!bar.isValid()) {
+      continue;
+    }
+    if (bar.getBarLength() < min_length) {
+      bar.setIsValid(false);
+    }
+  }
 }
 
 double BarcodeDetector::barcodeAngleDetermine(const std::vector<Bar>& bars) const {
@@ -444,6 +456,12 @@ std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
   cv::Mat draw_image2 = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
   cv::drawContours(draw_image2, draw_contours, -1, cv::Scalar(0, 255, 0));
   cv::imshow("contours2", draw_image2);
+
+  // 後続処理の計算量削減のため、短くてバーコードの可能性が少ないものは削除する
+  int max_image_length = image.rows > image.cols ? image.rows : image.cols;
+  removeShortContours(bars, (double)max_image_length * 0.03);
+  cv::Mat draw_image_short = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(0, 255, 255));
+  cv::imshow("short", draw_image_short);
 
   //
   // Outer contour to line transformation
