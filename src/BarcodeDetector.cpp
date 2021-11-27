@@ -4,6 +4,7 @@
 #include "BarcodeDetector.h"
 
 int BarcodeDetector::pdf_interval_t = 4;
+double BarcodeDetector::pdf_length_ratio = 0.12;
 
 cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
   // ガウシアンフィルタでノイズ除去
@@ -109,6 +110,67 @@ void BarcodeDetector::updateValidityWithAngle(std::vector<Bar>& bars, double deg
     }
 
     bar.setIsValid(is_valid);
+  }
+}
+
+double BarcodeDetector::barcodeLengthDetermine(const std::vector<Bar>& bars) const {
+  std::vector<double> length_list;
+  for (const auto& bar : bars) {
+    if(!bar.isValid()) {
+      continue;
+    }
+
+    const double length = bar.getBarLength();
+    length_list.push_back(length);
+
+    std::cout << "length: " << length << std::endl;
+  }
+
+  int max_valid_num = 0;
+  double max_valid_length = 0.0;
+  for (uint i = 0; i < bars.size(); i++) {
+    if (!bars.at(i).isValid()) {
+      continue;
+    }
+
+    const double base_length = bars.at(i).getBarLength();
+    const double offset = base_length * pdf_length_ratio;
+    const double min_threshold = bars.at(i).getBarLength() - offset;
+    const double max_threshold = bars.at(i).getBarLength() + offset;
+    int valid_num = 0;
+    for (uint j = 0; j < bars.size(); j++) {
+      if (!bars.at(j).isValid()) {
+        continue;
+      }
+
+      const double length = bars.at(j).getBarLength();
+      if (length >= min_threshold && length <= max_threshold) {
+        valid_num++;
+      }
+    }
+
+    if (valid_num > max_valid_num) {
+      max_valid_num = valid_num;
+      max_valid_length = base_length;
+    }
+  }
+
+  return max_valid_length;
+}
+
+void BarcodeDetector::updateValidityWithLength(std::vector<Bar>& bars, double length) const {
+  const double offset = length * pdf_length_ratio;
+  const double min_threshold = length - offset;
+  const double max_threshold = length + offset;
+  for (auto& bar : bars) {
+    if (!bar.isValid()) {
+      continue;
+    }
+
+    const double bar_length = bar.getBarLength();
+    if (bar_length < min_threshold || bar_length > max_threshold) {
+      bar.setIsValid(false);
+    }
   }
 }
 
@@ -264,11 +326,25 @@ void BarcodeDetector::detect(const cv::Mat& image) const {
     if (!bar.isValid()) {
       continue;
     }
-
     draw_barcode_contours.push_back(bar.getContour());
   }
   cv::Mat draw_image5 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_barcode_contours, cv::Scalar(255, 0, 255));
   cv::imshow("angle", draw_image5);
+
+  // バーの長さがバーコードに含まれていないバーは無効にする
+  const double bar_length = barcodeLengthDetermine(bars);
+  updateValidityWithLength(bars, bar_length);
+  std::cout << "fixed length: " << bar_length << std::endl;
+
+  std::vector<std::vector<cv::Point>> draw_length_contours;
+  for (const Bar& bar : bars) {
+    if (!bar.isValid()) {
+      continue;
+    }
+    draw_length_contours.push_back(bar.getContour());
+  }
+  cv::Mat draw_image6 = drawLines(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), draw_length_contours, cv::Scalar(125, 255, 0));
+  cv::imshow("length", draw_image6);
 
   cv::waitKey(0);
 }

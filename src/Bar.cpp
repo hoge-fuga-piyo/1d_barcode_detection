@@ -22,6 +22,7 @@ bool Bar::isBarcodeElement() {
 }
 
 double Bar::getDiagonalLength(const std::vector<cv::Point>& contour) const {
+  // バーコードの一部ならほぼ長方形のはずなので、この値は対角線の近似値になるはず
   cv::Point max_x_point = *std::max_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
     return p1.x < p2.x;
   });
@@ -320,6 +321,11 @@ void Bar::setIsValid(bool is_valid) {
 
 double Bar::getDegree() const {
   return degree;
+}
+
+double Bar::getBarLength() const {
+  // 長編の方が圧倒的に長いバーコード成分なら、バーの長さを対角線の長さで近似できるはず
+  return getDiagonalLength(contour);
 }
 
 void Bar::lineFitting() {

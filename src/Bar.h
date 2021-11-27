@@ -35,6 +35,7 @@ public:
   bool isValid() const;
   void setIsValid(bool is_valid);
   double getDegree() const;
+  double getBarLength() const;
   void lineFitting();
 
   // for DEBUG

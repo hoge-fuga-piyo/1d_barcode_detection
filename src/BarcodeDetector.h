@@ -12,11 +12,14 @@ private:
   };
 
   static int pdf_interval_t;
+  static double pdf_length_ratio;
 
   cv::Mat preprocessing(const cv::Mat& image) const;
   std::vector<std::vector<cv::Point>> contoursDetection(const cv::Mat& binary_image) const;
   double barcodeAngleDetermine(const std::vector<Bar>& bars) const;
   void updateValidityWithAngle(std::vector<Bar>& bars, double degree) const;
+  double barcodeLengthDetermine(const std::vector<Bar>& bars) const;
+  void updateValidityWithLength(std::vector<Bar>& bars, double length) const;
 
   // for DEBUG
   cv::Mat drawLines(const cv::Mat& image, std::vector<std::vector<cv::Point>> lines, cv::Scalar color) const;
