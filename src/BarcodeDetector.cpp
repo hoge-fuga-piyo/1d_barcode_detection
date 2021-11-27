@@ -259,9 +259,9 @@ std::array<cv::Point, 4> BarcodeDetector::getBarcodeCorner(std::vector<Bar>& bar
   });
 
   std::array<cv::Point, 4> corner;
-  corner[0] = cv::Point(min_x_point.x, min_y_point.y);
-  corner[1] = cv::Point(max_x_point.x, min_y_point.y);
-  corner[2] = cv::Point(min_x_point.x, max_y_point.y);
+  corner[0] = cv::Point(min_x_point.x, max_y_point.y);
+  corner[1] = cv::Point(min_x_point.x, min_y_point.y);
+  corner[2] = cv::Point(max_x_point.x, min_y_point.y);
   corner[3] = cv::Point(max_x_point.x, max_y_point.y);
 
   return corner;
