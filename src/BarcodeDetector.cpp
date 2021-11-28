@@ -37,8 +37,8 @@ cv::Mat BarcodeDetector::preprocessing(const cv::Mat& image) const {
 
   // 二値化
   cv::Mat binary_image;
-  //double threshold = cv::threshold(dog_image, binary_image, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
-  double threshold = cv::threshold(dog_image, binary_image, 4, 255, cv::THRESH_BINARY_INV);
+  double threshold = cv::threshold(dog_image, binary_image, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+  //double threshold = cv::threshold(dog_image, binary_image, 4, 255, cv::THRESH_BINARY_INV);
   std::cout << "binary threshold: " << threshold << std::endl;
 
   //cv::imshow("dog", dog_image);
@@ -268,7 +268,7 @@ void BarcodeDetector::removeFewBarDirection(std::vector<Bar>& bars) const {
 // なので、あるバーと最も近いバーとの距離が一定以上大きければバーの一部とはみなさない
 // 具体的には、最も近いバーとの距離が、バーの長さ*閾値以上ならバーの一部とはみなさない
 void BarcodeDetector::removeSingleBar(std::vector<Bar>& bars) const {
-  const double ratio_threshold = 0.5;
+  const double ratio_threshold = 1.0;
 
   for (uint i = 0; i < bars.size(); i++) {
     if (!bars.at(i).isValid()) {
@@ -300,16 +300,21 @@ void BarcodeDetector::removeSingleBar(std::vector<Bar>& bars) const {
   }
 }
 
-std::array<cv::Point, 4> BarcodeDetector::getBarcodeCorner(std::vector<Bar>& bars) const {
+std::vector<cv::Point> BarcodeDetector::getBarcodeCorner(std::vector<Bar>& bars) const {
+  int valid_bar_num = 0;
   std::vector<cv::Point> points;
-
   for (const auto& bar : bars) {
     if (!bar.isValid()) {
       continue;
     }
 
+    valid_bar_num++;
     std::array<cv::Point, 4> contour = bar.getCorner();
     points.insert(points.end(), contour.begin(), contour.end());
+  }
+  
+  if (valid_bar_num < 4) {
+    return std::vector<cv::Point>();
   }
 
   cv::Point max_x_point = *std::max_element(points.begin(), points.end(), [](const cv::Point& p1, const cv::Point& p2) {
@@ -328,11 +333,11 @@ std::array<cv::Point, 4> BarcodeDetector::getBarcodeCorner(std::vector<Bar>& bar
     return p1.y < p2.y;
   });
 
-  std::array<cv::Point, 4> corner;
-  corner[0] = cv::Point(min_x_point.x, max_y_point.y);
-  corner[1] = cv::Point(min_x_point.x, min_y_point.y);
-  corner[2] = cv::Point(max_x_point.x, min_y_point.y);
-  corner[3] = cv::Point(max_x_point.x, max_y_point.y);
+  std::vector<cv::Point> corner;
+  corner.push_back(cv::Point(min_x_point.x, max_y_point.y));
+  corner.push_back(cv::Point(min_x_point.x, min_y_point.y));
+  corner.push_back(cv::Point(max_x_point.x, min_y_point.y));
+  corner.push_back(cv::Point(max_x_point.x, max_y_point.y));
 
   return corner;
 }
@@ -427,7 +432,7 @@ cv::Mat BarcodeDetector::drawBars(const cv::Mat& image, const std::vector<Bar>& 
   return drawLines(image, contours, color);
 }
 
-std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
+std::vector<cv::Point> BarcodeDetector::detect(const cv::Mat& image) const {
   //
   // Barcode Detection Method
   //
@@ -524,8 +529,13 @@ std::array<cv::Point, 4> BarcodeDetector::detect(const cv::Mat& image) const {
   cv::Mat draw_image8 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(255, 0, 125));
   cv::imshow("nearest", draw_image8);
 
+  // バーが平行に一定以上存在する部分のみをバーコードとみなす
+  removeFewBarDirection(bars);
+  cv::Mat draw_image9 = drawBars(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), bars, cv::Scalar(0, 255, 125));
+  cv::imshow("direction2", draw_image9);
+
   // バーコードの領域を示す端の4点を返す
-  std::array<cv::Point, 4> corner = getBarcodeCorner(bars);
+  std::vector<cv::Point> corner = getBarcodeCorner(bars);
 
   cv::waitKey(0);
 
