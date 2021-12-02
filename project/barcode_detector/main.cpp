@@ -3,6 +3,7 @@
 #include <opencv2/barcode.hpp>
 
 #include "BarcodeDetector.h"
+#include "BarcodeDetector2.h"
 #include "DefaultBarcodeDetector.h"
 
 int main() {
@@ -17,8 +18,9 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test18.jpg");
 	cv::Mat image = cv::imread("../../../data/test20.jpg");
 
-	const bool use_original_decoder = true;
-	const bool use_default_decoder = true;
+	const bool use_original_decoder = false;
+	const bool use_default_decoder = false;
+	const bool use_original_decoder2 = true;
 
 	// バーコード検出
 	if (use_original_decoder) {
@@ -69,6 +71,11 @@ int main() {
 		} else {
 			std::cout << "Failed to decode" << std::endl;
 		}
+	}
+
+	if (use_original_decoder2) {
+		BarcodeDetector2 detector;
+		detector.detect(image);
 	}
 
 	cv::waitKey(0);
