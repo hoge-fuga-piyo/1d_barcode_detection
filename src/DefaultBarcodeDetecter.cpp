@@ -38,20 +38,48 @@ cv::Mat DefaultBarcodeDetector::flatten(const cv::Mat& image, const std::vector<
   const double p = 5.0;
   cv::Mat dog_sharp_image = (1.0 + p) * gaussian_small - p * gaussian_large;
 
-  dog_sharp_image.copyTo(barcode_part);
-
-  //cv::imshow("barcode", barcode_part);
+  cv::imshow("barcode", barcode_part);
   cv::imshow("clahe2", clahe_image);
   cv::imshow("dog", dog_sharp_image);
   //cv::imshow("result", dst_image);
+
+  //cv::Mat bilateral_image = dog_sharp_image.clone();
+  //for (int i = 0; i < 10; i++) {
+  //  cv::Mat tmp_image;
+  //  cv::bilateralFilter(bilateral_image, tmp_image, 5, 5, 5);
+  //  bilateral_image = tmp_image.clone();
+  //}
+  //cv::imshow("bilateral", bilateral_image);
+
+  dog_sharp_image.copyTo(barcode_part);
+  //clahe_image.copyTo(barcode_part);
 
   return dst_image;
 }
 
 std::vector<cv::Point2f> DefaultBarcodeDetector::detect(const cv::Mat& image) const {
+  //
+  // 画像の加工なしで検出
+  //
   std::vector<cv::Point2f> corners;
   cv::barcode::BarcodeDetector detector;
   detector.detect(image, corners);
+  if (corners.size() > 0) {
+    std::cout << "Find corners by method 0" << std::endl;
+    return corners;
+  }
+
+  ////
+  //// CLAHEを使ったコントラストの平坦化
+  ////
+  //cv::Mat clahe_image;
+  //cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(4, cv::Size(32, 32));
+  //clahe->apply(image, clahe_image);
+  //detector.detect(clahe_image, corners);
+  //if (corners.size() > 0) {
+  //  std::cout << "Find corners by method 1" << std::endl;
+  //  return corners;
+  //}
 
   return corners;
 }

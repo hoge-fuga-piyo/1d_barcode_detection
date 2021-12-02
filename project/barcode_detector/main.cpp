@@ -13,9 +13,11 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test5.jpg");
 	//cv::Mat image = cv::imread("../../../data/test6.jpg");
 	//cv::Mat image = cv::imread("../../../data/test15.jpg");
-	cv::Mat image = cv::imread("../../../data/test16.jpg");
+	//cv::Mat image = cv::imread("../../../data/test16.jpg");
+	//cv::Mat image = cv::imread("../../../data/test18.jpg");
+	cv::Mat image = cv::imread("../../../data/test20.jpg");
 
-	const bool use_original_decoder = false;
+	const bool use_original_decoder = true;
 	const bool use_default_decoder = true;
 
 	// バーコード検出
@@ -44,7 +46,6 @@ int main() {
 			}
 		}
 	}
-
 
 	// 比較用にOpenCVにデフォルトで実装されてるバーコード検出
 	if (use_default_decoder) {
