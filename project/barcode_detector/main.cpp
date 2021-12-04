@@ -8,7 +8,7 @@
 
 int main() {
 	//cv::Mat image = cv::imread("../../../data/test.jpg");
-	//cv::Mat image = cv::imread("../../../data/test2.jpg");
+	cv::Mat image = cv::imread("../../../data/test2.jpg");
 	//cv::Mat image = cv::imread("../../../data/test3.jpg");
 	//cv::Mat image = cv::imread("../../../data/test4.jpg");
 	//cv::Mat image = cv::imread("../../../data/test5.jpg");
@@ -20,10 +20,16 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test18.jpg");
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 
-	cv::Mat image = cv::imread("../../../data/test2.jpg");
+	//cv::Mat image = cv::imread("../../../data/test20.jpg");
+	//cv::Mat image = cv::imread("../../../data/test13.jpg");
+	//cv::Mat image = cv::imread("../../../data/test14.jpg");
+
+	//cv::Mat image = cv::imread("../../../data/test18.jpg");
+
+	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 
 	const bool use_original_decoder = false;
-	const bool use_default_decoder = false;
+	const bool use_default_decoder = true;
 	const bool use_original_decoder2 = true;
 
 	// バーコード検出
@@ -55,6 +61,10 @@ int main() {
 
 	// 比較用にOpenCVにデフォルトで実装されてるバーコード検出
 	if (use_default_decoder) {
+		std::cout << "=============================" << std::endl;
+		std::cout << "=  OpenCV default detector  =" << std::endl;
+		std::cout << "=============================" << std::endl;
+
 		// バーコード検出
 		cv::Mat gray_image;
 		cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
@@ -78,8 +88,31 @@ int main() {
 	}
 
 	if (use_original_decoder2) {
+		std::cout << "============================================" << std::endl;
+		std::cout << "=  OpenCV default detector with preprocess =" << std::endl;
+		std::cout << "============================================" << std::endl;
+
+		// バーコード検出
 		BarcodeDetector2 detector;
-		detector.detect(image);
+		std::vector<cv::Point2f> corners = detector.detect(image);
+		if (corners.size() > 0) {
+			std::cout << "Find barcodes: " << corners.size() / 4 << std::endl;
+		} else {
+			std::cout << "Cannot find barcodes" << std::endl;
+		}
+
+		// バーコードデコード
+		cv::Mat gray_image;
+		cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
+		std::vector<ArticleNumber> article_numbers = detector.decode(gray_image, corners);
+		if (article_numbers.size() > 0) {
+			for (const auto& number : article_numbers) {
+				std::cout << number.method_type << " " << number.type << " : " << number.article_number << std::endl;
+			}
+		} else {
+			std::cout << "Failed to decode" << std::endl;
+		}
+
 	}
 
 	cv::waitKey(0);

@@ -38,9 +38,9 @@ cv::Mat DefaultBarcodeDetector::flatten(const cv::Mat& image, const std::vector<
   const double p = 5.0;
   cv::Mat dog_sharp_image = (1.0 + p) * gaussian_small - p * gaussian_large;
 
-  cv::imshow("barcode", barcode_part);
-  cv::imshow("clahe2", clahe_image);
-  cv::imshow("dog", dog_sharp_image);
+  //cv::imshow("barcode", barcode_part);
+  //cv::imshow("clahe2", clahe_image);
+  //cv::imshow("dog", dog_sharp_image);
   //cv::imshow("result", dst_image);
 
   //cv::Mat bilateral_image = dog_sharp_image.clone();

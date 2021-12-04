@@ -1,14 +1,12 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <opencv2/barcode.hpp>
+#include <chrono>
 #include "BarcodeDetector2.h"
 
 BarcodeDetector2::BarcodeDetector2() : detect_num(2), minimum_bar_num(5) {}
 
-cv::Mat BarcodeDetector2::preprocess(const cv::Mat& image) const {
-  // グレースケール変換
-  cv::Mat gray_image;
-  cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
-
+cv::Mat BarcodeDetector2::preprocess(const cv::Mat& gray_image) const {
   // DoGフィルタでエッジ抽出
   cv::Mat gaussian_small, gaussian_large;
   cv::GaussianBlur(gray_image, gaussian_small, cv::Size(3, 3), 0, 0);
@@ -145,7 +143,7 @@ double BarcodeDetector2::getBarLength(const std::vector<cv::Point>& contour) con
 }
 
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParallelContours(const std::vector<std::vector<cv::Point>>& contours) const {
-  const double radian_threshold = 8.0 * (M_PI / 180.0);
+  const double radian_threshold = 10.0 * (M_PI / 180.0);
 
   auto get_direction = [&](const std::vector<cv::Point>& contour) {
     const auto min_max_point = getMinMaxPoint(contour);
@@ -168,20 +166,19 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParalle
     const cv::Vec2d base_vector(base_center_point2 - base_center_point1);
 
     const BarcodeDetector2::Direction direction = get_direction(contours.at(i));
-    if (direction == Direction::Vertical) {
-      const double cos_theta = base_vector.dot(cv::Vec2d(1.0, 0.0)) / (cv::norm(base_vector));
-      const double radian = std::acos(cos_theta);
-      if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
-        continue;
-      }
-    } else {
-      const double cos_theta = base_vector.dot(cv::Vec2d(0.0, 1.0)) / (cv::norm(base_vector));
-      const double radian = std::acos(cos_theta);
-      if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
-        std::cout << radian * (180.0 / M_PI) << std::endl;
-        continue;
-      }
-    }
+    //if (direction == Direction::Vertical) {
+    //  const double cos_theta = base_vector.dot(cv::Vec2d(1.0, 0.0)) / (cv::norm(base_vector));
+    //  const double radian = std::acos(cos_theta);
+    //  if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
+    //    continue;
+    //  }
+    //} else {
+    //  const double cos_theta = base_vector.dot(cv::Vec2d(0.0, 1.0)) / (cv::norm(base_vector));
+    //  const double radian = std::acos(cos_theta);
+    //  if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
+    //    continue;
+    //  }
+    //}
 
     std::vector<std::vector<cv::Point>> parallel_contours{ contours.at(i), contours.at(i + 1) };
     for (uint j = 0; j < contours.size(); j++) {
@@ -260,10 +257,12 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLen
 
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectNearContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
   const double length_ratio_threshold = 0.5;
+  const int near_bar_num_threshold = 2;
 
   std::vector<std::vector<std::vector<cv::Point>>> new_all_parallel_contours;
   for (const auto& parallel_contours : all_parallel_contours) {
     std::vector<std::vector<cv::Point>> new_parallel_contours;
+    int near_bar_num = 0;
     for (uint i = 0; i < parallel_contours.size(); i++) {
       const cv::Point2d base_center = getCenter(parallel_contours.at(i));
       const double base_length = getBarLength(parallel_contours.at(i));
@@ -274,7 +273,10 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectNearCon
 
         const cv::Point2d target_center = getCenter(parallel_contours.at(j));
         if (cv::norm(base_center - target_center) < base_length * length_ratio_threshold) {
-          new_parallel_contours.push_back(parallel_contours.at(i));
+          near_bar_num++;
+          if (near_bar_num >= near_bar_num_threshold) {
+            new_parallel_contours.push_back(parallel_contours.at(i));
+          }
           break;
         }
       }
@@ -304,7 +306,6 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::getResultCont
   };
 
   // 領域の重ならない上位N個の輪郭群を求める
-  std::cout << "sorted num:" << std::endl;
   std::vector<std::vector<std::vector<cv::Point>>> result_parallel_contours;
   for (const auto& parallel_contours : sorted_parallel_contours) {
     const auto target_min_max_point = getMinMaxPoint(parallel_contours);
@@ -332,7 +333,6 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::getResultCont
 
     if (!is_overlap) {
       result_parallel_contours.push_back(parallel_contours);
-      std::cout << target_min_x_point.x << ", " << target_max_x_point.x << ", " << target_min_y_point.y << ", " << target_max_y_point.y << std::endl;
       if (result_parallel_contours.size() == detect_num) {
         break;
       }
@@ -340,6 +340,34 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::getResultCont
   }
 
   return result_parallel_contours;
+}
+
+cv::Mat BarcodeDetector2::createBarcodeImage(const cv::Mat& gray_image, const std::vector<std::vector<std::vector<cv::Point>>>& parallel_contours) const {
+  const double margin_ratio_threshold = 0.7;
+
+  cv::Mat dst_image = cv::Mat(gray_image.rows, gray_image.cols, CV_8UC1, cv::Scalar(255));
+  for (const auto& contours : parallel_contours) {
+      const auto min_max_point = getMinMaxPoint(contours);
+      const cv::Point min_x_point = min_max_point.at(0);
+      const cv::Point max_x_point = min_max_point.at(1);
+      const cv::Point min_y_point = min_max_point.at(2);
+      const cv::Point max_y_point = min_max_point.at(3);
+      const int x_length = max_x_point.x - min_x_point.x;
+      const int y_length = max_y_point.y - min_y_point.y;
+      const int x_margin = x_length * margin_ratio_threshold;
+      const int y_margin = y_length * margin_ratio_threshold;
+      const int x_start = std::max(0, min_x_point.x - x_margin);
+      const int y_start = std::max(0, min_y_point.y - y_margin);
+      const int x_end = std::min(max_x_point.x + x_margin, gray_image.cols);
+      const int y_end = std::min(max_y_point.y + y_margin, gray_image.rows);
+
+      cv::Mat image_part(gray_image, cv::Rect(x_start, y_start, x_end - x_start, y_end - y_start));
+      cv::Mat dst_image_part(dst_image, cv::Rect(x_start, y_start, x_end - x_start, y_end - y_start));
+
+      image_part.copyTo(dst_image_part);
+  }
+
+  return dst_image;
 }
 
 cv::Mat BarcodeDetector2::drawContourGroup(const cv::Mat& image, const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
@@ -378,14 +406,23 @@ cv::Mat BarcodeDetector2::drawContourGroup(const cv::Mat& image, const std::vect
   return dst_image;
 }
 
-void BarcodeDetector2::detect(const cv::Mat& image) const {
-  bool draw_image_flag = true;
+std::vector<cv::Point2f> BarcodeDetector2::detect(const cv::Mat& image) const {
+  bool draw_image_flag = false;
 
   // 前処理
-  cv::Mat filtered_image = preprocess(image);
+  // グレースケール変換
+  auto start = std::chrono::system_clock::now();
+  cv::Mat gray_image;
+  cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
+  cv::Mat filtered_image = preprocess(gray_image);
+  auto end = std::chrono::system_clock::now();
+  std::cout << "preprocess : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   // 輪郭抽出
+  start = std::chrono::system_clock::now();
   std::vector<std::vector<cv::Point>> contours = contoursDetection(filtered_image);
+  end = std::chrono::system_clock::now();
+  std::cout << "find contours : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   if (draw_image_flag) {
     cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
@@ -394,7 +431,10 @@ void BarcodeDetector2::detect(const cv::Mat& image) const {
   }
 
   // 不要な輪郭を削除
+  start = std::chrono::system_clock::now();
   contours = removeInvalidContours(contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "remove short contours : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   if (draw_image_flag) {
     cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
@@ -403,7 +443,10 @@ void BarcodeDetector2::detect(const cv::Mat& image) const {
   }
 
   // 平行な輪郭ごとに分ける
+  start = std::chrono::system_clock::now();
   std::vector<std::vector<std::vector<cv::Point>>> all_parallel_contours = detectParallelContours(contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "parallel contours : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   if (draw_image_flag) {
     std::vector<std::vector<cv::Point>> tmp_contours;
@@ -421,7 +464,10 @@ void BarcodeDetector2::detect(const cv::Mat& image) const {
   }
 
   // 長さが不揃いな輪郭は捨てる
+  start = std::chrono::system_clock::now();
   all_parallel_contours = detectSameLengthContours(all_parallel_contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "same length : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   if (draw_image_flag) {
     std::vector<std::vector<cv::Point>> tmp_contours;
@@ -430,7 +476,6 @@ void BarcodeDetector2::detect(const cv::Mat& image) const {
         tmp_contours.push_back(contour);
       }
     }
-    std::cout << "tmp contours:" << tmp_contours.size() << std::endl;
     cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
     cv::drawContours(draw_image, tmp_contours, -1, cv::Scalar(0, 0, 255));
     cv::imshow("draw4", draw_image);
@@ -440,7 +485,10 @@ void BarcodeDetector2::detect(const cv::Mat& image) const {
   }
 
   // 隣り合うバーまでの距離が空いている輪郭は捨てる
+  start = std::chrono::system_clock::now();
   all_parallel_contours = detectNearContours(all_parallel_contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "near contours : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   if (draw_image_flag) {
     cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
@@ -448,20 +496,96 @@ void BarcodeDetector2::detect(const cv::Mat& image) const {
   }
 
   // 再度平行になっていないものを捨てる
+  start = std::chrono::system_clock::now();
   all_parallel_contours = detectParallelContours(all_parallel_contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "parallel contours2 : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   if (draw_image_flag) {
     cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
     cv::imshow("draw6", draw_image);
   }
 
-  // 密度の低い輪郭は捨てる
-
-  // バーの数が多い上位N件を取得
-  all_parallel_contours = getResultContours(all_parallel_contours);
+  // 再度隣り合うバーを調べて距離が空いているものは捨てる
+  start = std::chrono::system_clock::now();
+  all_parallel_contours = detectNearContours(all_parallel_contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "near contours2 : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   if (draw_image_flag) {
     cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
     cv::imshow("draw7", draw_image);
   }
+
+  // 再度平行になっていないものを捨てる
+  start = std::chrono::system_clock::now();
+  all_parallel_contours = detectParallelContours(all_parallel_contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "parallel contours3 : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
+
+  if (draw_image_flag) {
+    cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
+    cv::imshow("draw8", draw_image);
+  }
+
+  // バーの数が多い上位N件を取得
+  start = std::chrono::system_clock::now();
+  all_parallel_contours = getResultContours(all_parallel_contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "result contours : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
+
+  if (draw_image_flag) {
+    cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
+    cv::imshow("draw9", draw_image);
+  }
+
+  // バーコードの領域以外を白塗りした画像を作る
+  start = std::chrono::system_clock::now();
+  cv::Mat result_image = createBarcodeImage(gray_image, all_parallel_contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "white image : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
+
+  if (draw_image_flag) {
+    cv::imshow("result", result_image);
+  }
+
+  // バーコードの検出
+  std::vector<cv::Point2f> barcode_corners;
+  cv::barcode::BarcodeDetector detector;
+  detector.detect(result_image, barcode_corners);
+
+  if (draw_image_flag) {
+    cv::Mat draw_image = image.clone();
+    for (const auto& corner : barcode_corners) {
+      cv::circle(draw_image, corner, 3, cv::Scalar(0, 0, 255), -1);
+    }
+    cv::imshow("result_plot", draw_image);
+  }
+
+  return barcode_corners;
+}
+
+std::vector<ArticleNumber> BarcodeDetector2::decode(const cv::Mat& image, const std::vector<cv::Point2f>& corners) const {
+  if (corners.size() < 4 || corners.size() % 4 != 0) {
+    std::cout << "Invalid corner num" << std::endl;
+    return std::vector<ArticleNumber>();
+  }
+
+  std::vector<ArticleNumber> article_numbers;
+  cv::barcode::BarcodeDetector detector;
+
+  std::vector<std::string> decoded_info;
+  std::vector<cv::barcode::BarcodeType> decoded_type;
+  detector.decode(image, corners, decoded_info, decoded_type);
+  for (uint i = 0; i < decoded_info.size(); i++) {
+    if (decoded_type.at(i) != cv::barcode::BarcodeType::NONE) {
+      ArticleNumber article_number;
+      article_number.article_number = decoded_info.at(i);
+      article_number.type = decoded_type.at(i);
+      article_number.method_type = 0;
+      article_numbers.push_back(article_number);
+    }
+  }
+ 
+  return article_numbers;
 }
