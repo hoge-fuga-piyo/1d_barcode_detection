@@ -13,10 +13,14 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test4.jpg");
 	//cv::Mat image = cv::imread("../../../data/test5.jpg");
 	//cv::Mat image = cv::imread("../../../data/test6.jpg");
+	//cv::Mat image = cv::imread("../../../data/test10.jpg");
 	//cv::Mat image = cv::imread("../../../data/test15.jpg");
 	//cv::Mat image = cv::imread("../../../data/test16.jpg");
+	//cv::Mat image = cv::imread("../../../data/test17.jpg");
 	//cv::Mat image = cv::imread("../../../data/test18.jpg");
-	cv::Mat image = cv::imread("../../../data/test20.jpg");
+	//cv::Mat image = cv::imread("../../../data/test20.jpg");
+
+	cv::Mat image = cv::imread("../../../data/test2.jpg");
 
 	const bool use_original_decoder = false;
 	const bool use_default_decoder = false;

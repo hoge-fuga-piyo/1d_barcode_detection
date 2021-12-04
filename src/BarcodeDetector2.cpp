@@ -55,6 +55,42 @@ std::array<cv::Point, 4> BarcodeDetector2::getMinMaxPoint(const std::vector<cv::
   };
 }
 
+std::array<cv::Point, 4> BarcodeDetector2::getMinMaxPoint(const std::vector<std::vector<cv::Point>>& contours) const {
+  const auto result_min_max_point = getMinMaxPoint(contours.at(0));
+  cv::Point result_min_x_point = result_min_max_point.at(0);
+  cv::Point result_max_x_point = result_min_max_point.at(1);
+  cv::Point result_min_y_point = result_min_max_point.at(2);
+  cv::Point result_max_y_point = result_min_max_point.at(3);
+
+  for (uint i = 1; i < contours.size(); i++) {
+    const auto min_max_point = getMinMaxPoint(contours.at(i));
+    const cv::Point min_x_point = min_max_point.at(0);
+    const cv::Point max_x_point = min_max_point.at(1);
+    const cv::Point min_y_point = min_max_point.at(2);
+    const cv::Point max_y_point = min_max_point.at(3);
+
+    if (result_min_x_point.x > min_x_point.x) {
+      result_min_x_point = min_x_point;
+    }
+    if (result_max_x_point.x < max_x_point.x) {
+      result_max_x_point = max_x_point;
+    }
+    if (result_min_y_point.y > min_y_point.y) {
+      result_min_y_point = min_y_point;
+    }
+    if (result_max_y_point.y < max_y_point.y) {
+      result_max_y_point = max_y_point;
+    }
+  }
+
+  return std::array<cv::Point, 4>{
+    result_min_x_point,
+    result_max_x_point,
+    result_min_y_point,
+    result_max_y_point
+  };
+}
+
 std::vector<std::vector<cv::Point>> BarcodeDetector2::removeSmallContours(const std::vector<std::vector<cv::Point>>& contours) const {
   const int threshold = 20;
 
@@ -109,16 +145,50 @@ double BarcodeDetector2::getBarLength(const std::vector<cv::Point>& contour) con
 }
 
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParallelContours(const std::vector<std::vector<cv::Point>>& contours) const {
-  const double radian_threshold = 5.0 * (M_PI / 180.0);
+  const double radian_threshold = 8.0 * (M_PI / 180.0);
+
+  auto get_direction = [&](const std::vector<cv::Point>& contour) {
+    const auto min_max_point = getMinMaxPoint(contour);
+    const cv::Point min_x_point = min_max_point.at(0);
+    const cv::Point max_x_point = min_max_point.at(1);
+    const cv::Point min_y_point = min_max_point.at(2);
+    const cv::Point max_y_point = min_max_point.at(3);
+
+    if (max_x_point.x - min_x_point.x > max_y_point.y - min_y_point.y) {
+      return Direction::Horizontal;
+    } else {
+      return Direction::Vertical;
+    }
+  };
 
   std::vector<std::vector<std::vector<cv::Point>>> all_parallel_contours;
   for (uint i = 0; i < contours.size() - 1; i++) {
     const cv::Point2d base_center_point1 = getCenter(contours.at(i));
     const cv::Point2d base_center_point2 = getCenter(contours.at(i + 1));
     const cv::Vec2d base_vector(base_center_point2 - base_center_point1);
+
+    const BarcodeDetector2::Direction direction = get_direction(contours.at(i));
+    if (direction == Direction::Vertical) {
+      const double cos_theta = base_vector.dot(cv::Vec2d(1.0, 0.0)) / (cv::norm(base_vector));
+      const double radian = std::acos(cos_theta);
+      if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
+        continue;
+      }
+    } else {
+      const double cos_theta = base_vector.dot(cv::Vec2d(0.0, 1.0)) / (cv::norm(base_vector));
+      const double radian = std::acos(cos_theta);
+      if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
+        std::cout << radian * (180.0 / M_PI) << std::endl;
+        continue;
+      }
+    }
+
     std::vector<std::vector<cv::Point>> parallel_contours{ contours.at(i), contours.at(i + 1) };
     for (uint j = 0; j < contours.size(); j++) {
       if (i == j || i + 1 == j) {
+        continue;
+      }
+      if (direction != get_direction(contours.at(j))) {
         continue;
       }
 
@@ -138,8 +208,24 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParalle
   return all_parallel_contours;
 }
 
+std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParallelContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
+  std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
+  for (const auto& parallel_contours : all_parallel_contours) {
+    auto result_parallel_contours = detectParallelContours(parallel_contours);
+    std::sort(result_parallel_contours.begin(), result_parallel_contours.end(), [](const std::vector<std::vector<cv::Point>>& contours1, const std::vector<std::vector<cv::Point>>& contours2) {
+      return contours1.size() > contours2.size();
+    });
+    
+    if (result_parallel_contours.size() > 0) {
+      new_parallel_contours.push_back(result_parallel_contours.at(0));
+    }
+  }
+
+  return new_parallel_contours;
+}
+
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLengthContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
-  const double ratio_threshold = 0.12;
+  const double ratio_threshold = 0.7;
 
   std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
   for (const auto& parallel_contours : all_parallel_contours) {
@@ -172,6 +258,90 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLen
   return new_parallel_contours;
 }
 
+std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectNearContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
+  const double length_ratio_threshold = 0.5;
+
+  std::vector<std::vector<std::vector<cv::Point>>> new_all_parallel_contours;
+  for (const auto& parallel_contours : all_parallel_contours) {
+    std::vector<std::vector<cv::Point>> new_parallel_contours;
+    for (uint i = 0; i < parallel_contours.size(); i++) {
+      const cv::Point2d base_center = getCenter(parallel_contours.at(i));
+      const double base_length = getBarLength(parallel_contours.at(i));
+      for (uint j = 0; j < parallel_contours.size(); j++) {
+        if (i == j) {
+          continue;
+        }
+
+        const cv::Point2d target_center = getCenter(parallel_contours.at(j));
+        if (cv::norm(base_center - target_center) < base_length * length_ratio_threshold) {
+          new_parallel_contours.push_back(parallel_contours.at(i));
+          break;
+        }
+      }
+    }
+
+    if (new_parallel_contours.size() >= minimum_bar_num) {
+      new_all_parallel_contours.push_back(new_parallel_contours);
+    }
+  }
+
+  return new_all_parallel_contours;
+}
+
+std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::getResultContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
+  std::vector<std::vector<std::vector<cv::Point>>> sorted_parallel_contours = all_parallel_contours;
+  std::sort(sorted_parallel_contours.begin(), sorted_parallel_contours.end(), [](const std::vector<std::vector<cv::Point>>& contours1, const std::vector<std::vector<cv::Point>>& contours2) {
+    return contours1.size() > contours2.size();
+  });
+
+  auto overlap = [](const cv::Point& rect1_1, const cv::Point& rect1_2, const cv::Point& rect2_1, const cv::Point& rect2_2) {
+    if (std::max(rect1_1.x, rect2_1.x) <= std::min(rect1_2.x, rect2_2.x)
+      && std::max(rect1_1.y, rect2_1.y) <= std::min(rect1_2.y, rect2_2.y)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  // óÃàÊÇÃèdÇ»ÇÁÇ»Ç¢è„à Nå¬ÇÃó÷äsåQÇãÅÇﬂÇÈ
+  std::cout << "sorted num:" << std::endl;
+  std::vector<std::vector<std::vector<cv::Point>>> result_parallel_contours;
+  for (const auto& parallel_contours : sorted_parallel_contours) {
+    const auto target_min_max_point = getMinMaxPoint(parallel_contours);
+    const cv::Point target_min_x_point = target_min_max_point.at(0);
+    const cv::Point target_max_x_point = target_min_max_point.at(1);
+    const cv::Point target_min_y_point = target_min_max_point.at(2);
+    const cv::Point target_max_y_point = target_min_max_point.at(3);
+
+    const cv::Point rect1_1 = cv::Point(target_min_x_point.x, target_min_y_point.y);
+    const cv::Point rect1_2 = cv::Point(target_max_x_point.x, target_max_y_point.y);
+
+    bool is_overlap = false;
+    for (const auto& result_contours : result_parallel_contours) {
+      const auto min_max_point = getMinMaxPoint(result_contours);
+      const cv::Point min_x_point = min_max_point.at(0);
+      const cv::Point max_x_point = min_max_point.at(1);
+      const cv::Point min_y_point = min_max_point.at(2);
+      const cv::Point max_y_point = min_max_point.at(3);
+
+      const cv::Point rect2_1 = cv::Point(min_x_point.x, min_y_point.y);
+      const cv::Point rect2_2 = cv::Point(max_x_point.x, max_y_point.y);
+
+      is_overlap = overlap(rect1_1, rect1_2, rect2_1, rect2_2);
+    }
+
+    if (!is_overlap) {
+      result_parallel_contours.push_back(parallel_contours);
+      std::cout << target_min_x_point.x << ", " << target_max_x_point.x << ", " << target_min_y_point.y << ", " << target_max_y_point.y << std::endl;
+      if (result_parallel_contours.size() == detect_num) {
+        break;
+      }
+    }
+  }
+
+  return result_parallel_contours;
+}
+
 cv::Mat BarcodeDetector2::drawContourGroup(const cv::Mat& image, const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
   cv::Mat dst_image = image.clone();
   for (const auto& parallel_contours : all_parallel_contours) {
@@ -198,6 +368,9 @@ cv::Mat BarcodeDetector2::drawContourGroup(const cv::Mat& image, const std::vect
       if (max_y < max_y_point.y) {
         max_y = max_y_point.y;
       }
+
+      cv::Point center = getCenter(contour);
+      cv::circle(dst_image, center, 3, cv::Scalar(0, 255, 255), -1);
     }
     cv::rectangle(dst_image, cv::Point(min_x, min_y), cv::Point(max_x, max_y), cv::Scalar(0, 255, 0));
   }
@@ -206,54 +379,89 @@ cv::Mat BarcodeDetector2::drawContourGroup(const cv::Mat& image, const std::vect
 }
 
 void BarcodeDetector2::detect(const cv::Mat& image) const {
+  bool draw_image_flag = true;
+
   // ëOèàóù
   cv::Mat filtered_image = preprocess(image);
 
   // ó÷äsíäèo
   std::vector<std::vector<cv::Point>> contours = contoursDetection(filtered_image);
 
-  cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
-  cv::drawContours(draw_image, contours, -1, cv::Scalar(0, 0, 255));
-  cv::imshow("draw1", draw_image);
+  if (draw_image_flag) {
+    cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
+    cv::drawContours(draw_image, contours, -1, cv::Scalar(0, 0, 255));
+    cv::imshow("draw1", draw_image);
+  }
 
   // ïsóvÇ»ó÷äsÇçÌèú
   contours = removeInvalidContours(contours);
 
-  draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
-  cv::drawContours(draw_image, contours, -1, cv::Scalar(0, 0, 255));
-  cv::imshow("draw2", draw_image);
+  if (draw_image_flag) {
+    cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
+    cv::drawContours(draw_image, contours, -1, cv::Scalar(0, 0, 255));
+    cv::imshow("draw2", draw_image);
+  }
 
   // ïΩçsÇ»ó÷äsÇ≤Ç∆Ç…ï™ÇØÇÈ
   std::vector<std::vector<std::vector<cv::Point>>> all_parallel_contours = detectParallelContours(contours);
 
-  std::vector<std::vector<cv::Point>> tmp_contours;
-  for (const auto& parallel_contours : all_parallel_contours) {
-    for (const auto& contour : parallel_contours) {
-      tmp_contours.push_back(contour);
+  if (draw_image_flag) {
+    std::vector<std::vector<cv::Point>> tmp_contours;
+    for (const auto& parallel_contours : all_parallel_contours) {
+      for (const auto& contour : parallel_contours) {
+        tmp_contours.push_back(contour);
+      }
     }
-  }
-  draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
-  cv::drawContours(draw_image, tmp_contours, -1, cv::Scalar(0, 0, 255));
-  cv::imshow("draw3", draw_image);
+    cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
+    cv::drawContours(draw_image, tmp_contours, -1, cv::Scalar(0, 0, 255));
+    cv::imshow("draw3", draw_image);
 
-  draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
-  cv::imshow("draw3_2", draw_image);
+    draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
+    cv::imshow("draw3_2", draw_image);
+  }
 
   // í∑Ç≥Ç™ïsëµÇ¢Ç»ó÷äsÇÕéÃÇƒÇÈ
-  std::vector<std::vector<std::vector<cv::Point>>> all_same_length_parallel_contours = detectSameLengthContours(all_parallel_contours);
+  all_parallel_contours = detectSameLengthContours(all_parallel_contours);
 
-  tmp_contours.clear();
-  for (const auto& parallel_contours : all_same_length_parallel_contours) {
-    std::cout << "size: " << parallel_contours.size() << std::endl;
-    for (const auto& contour : parallel_contours) {
-      tmp_contours.push_back(contour);
+  if (draw_image_flag) {
+    std::vector<std::vector<cv::Point>> tmp_contours;
+    for (const auto& parallel_contours : all_parallel_contours) {
+      for (const auto& contour : parallel_contours) {
+        tmp_contours.push_back(contour);
+      }
     }
-  }
-  std::cout << "tmp contours:" << tmp_contours.size() << std::endl;
-  draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
-  cv::drawContours(draw_image, tmp_contours, -1, cv::Scalar(0, 0, 255));
-  cv::imshow("draw4", draw_image);
+    std::cout << "tmp contours:" << tmp_contours.size() << std::endl;
+    cv::Mat draw_image = cv::Mat::zeros(image.rows, image.cols, CV_8UC3);
+    cv::drawContours(draw_image, tmp_contours, -1, cv::Scalar(0, 0, 255));
+    cv::imshow("draw4", draw_image);
 
-  draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_same_length_parallel_contours);
-  cv::imshow("draw4_2", draw_image);
+    draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
+    cv::imshow("draw4_2", draw_image);
+  }
+
+  // ó◊ÇËçáÇ§ÉoÅ[Ç‹Ç≈ÇÃãóó£Ç™ãÛÇ¢ÇƒÇ¢ÇÈó÷äsÇÕéÃÇƒÇÈ
+  all_parallel_contours = detectNearContours(all_parallel_contours);
+
+  if (draw_image_flag) {
+    cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
+    cv::imshow("draw5", draw_image);
+  }
+
+  // çƒìxïΩçsÇ…Ç»Ç¡ÇƒÇ¢Ç»Ç¢Ç‡ÇÃÇéÃÇƒÇÈ
+  all_parallel_contours = detectParallelContours(all_parallel_contours);
+
+  if (draw_image_flag) {
+    cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
+    cv::imshow("draw6", draw_image);
+  }
+
+  // ñßìxÇÃí·Ç¢ó÷äsÇÕéÃÇƒÇÈ
+
+  // ÉoÅ[ÇÃêîÇ™ëΩÇ¢è„à NåèÇéÊìæ
+  all_parallel_contours = getResultContours(all_parallel_contours);
+
+  if (draw_image_flag) {
+    cv::Mat draw_image = drawContourGroup(cv::Mat::zeros(image.rows, image.cols, CV_8UC3), all_parallel_contours);
+    cv::imshow("draw7", draw_image);
+  }
 }
