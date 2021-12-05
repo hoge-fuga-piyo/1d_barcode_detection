@@ -224,45 +224,79 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParalle
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLengthContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
   const double ratio_threshold = 0.7;
 
-  std::vector<std::vector<double>> all_bar_length_list(all_parallel_contours.size());
-  for (uint i = 0; i < all_parallel_contours.size(); i++) {
-    std::vector<double> tmp_bar_length_list(all_parallel_contours.at(i).size());
-    for (uint j = 0; j < all_parallel_contours.at(i).size(); j++) {
-      tmp_bar_length_list[j] = (getBarLength(all_parallel_contours.at(i).at(j)));
-    }
-    all_bar_length_list[i] = tmp_bar_length_list;
-  }
-
   std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
+  //std::vector<std::vector<std::tuple<double, uint>>> all_bar_length_list(all_parallel_contours.size());
   for (uint i = 0; i < all_parallel_contours.size(); i++) {
-    const std::vector<std::vector<cv::Point>>& parallel_contours = all_parallel_contours[i];
-    const std::vector<double>& bar_length_list = all_bar_length_list[i];
+    std::vector<std::tuple<double, uint>> tmp_bar_length_list(all_parallel_contours.at(i).size());
+    for (uint j = 0; j < all_parallel_contours.at(i).size(); j++) {
+      tmp_bar_length_list[j] = std::tuple<double, uint>(getBarLength(all_parallel_contours.at(i).at(j)), j);
+    }
 
-    std::vector<std::vector<cv::Point>> max_parallel_contours;
-    for (uint j = 0; j < parallel_contours.size(); j++) {
-      double base_length = bar_length_list.at(j);
-      std::vector<std::vector<cv::Point>> tmp_parallel_contours{ parallel_contours.at(j) };
-      tmp_parallel_contours.reserve(parallel_contours.size());
-      for (uint k = 0; k < parallel_contours.size(); k++) {
-        if (j == k) {
-          continue;
-        }
-        
-        double target_length = bar_length_list.at(k);
-        if (std::abs(base_length - target_length) < base_length * ratio_threshold) {
-          tmp_parallel_contours.push_back(parallel_contours.at(k));
+    // 距離の大きい順にソート
+    std::sort(tmp_bar_length_list.begin(), tmp_bar_length_list.end(), [](const auto& obj1, const auto& obj2) {
+      return std::get<0>(obj1) > std::get<0>(obj2);
+    });
+
+    std::vector<std::vector<cv::Point>> max_contours;
+    for (uint j = 0; j < tmp_bar_length_list.size(); j++) {
+      double base_length = std::get<0>(tmp_bar_length_list.at(j));
+
+      if (max_contours.size() > tmp_bar_length_list.size() - j) {
+        break;
+      }
+
+      std::vector<std::vector<cv::Point>> contours{ all_parallel_contours.at(i).at(j) };
+      for (int k = j + 1; k < tmp_bar_length_list.size(); k++) {
+        double target_length = std::get<0>(tmp_bar_length_list.at(k));
+        if (base_length - target_length < base_length * ratio_threshold) {
+          contours.push_back(all_parallel_contours.at(i).at(k));
+        } else {
+          break;
         }
       }
 
-      if (tmp_parallel_contours.size() > max_parallel_contours.size()) {
-        max_parallel_contours = tmp_parallel_contours;
+      if (max_contours.size() < contours.size()) {
+        max_contours = contours;
       }
     }
 
-    if (max_parallel_contours.size() >= minimum_bar_num) {
-      new_parallel_contours.push_back(max_parallel_contours);
+    if (max_contours.size() > minimum_bar_num) {
+      new_parallel_contours.push_back(max_contours);
     }
+
+    //all_bar_length_list[i] = tmp_bar_length_list;
   }
+
+  //std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
+  //for (uint i = 0; i < all_parallel_contours.size(); i++) {
+  //  const std::vector<std::vector<cv::Point>>& parallel_contours = all_parallel_contours[i];
+  //  const std::vector<std::tuple<double, uint>>& bar_length_list = all_bar_length_list[i];
+
+  //  std::vector<std::vector<cv::Point>> max_parallel_contours;
+  //  for (uint j = 0; j < parallel_contours.size(); j++) {
+  //    double base_length = std::get<0>(bar_length_list.at(j));
+  //    std::vector<std::vector<cv::Point>> tmp_parallel_contours{ parallel_contours.at(j) };
+  //    tmp_parallel_contours.reserve(parallel_contours.size());
+  //    for (uint k = 0; k < parallel_contours.size(); k++) {
+  //      if (j == k) {
+  //        continue;
+  //      }
+  //      
+  //      double target_length = std::get<0>(bar_length_list.at(k));
+  //      if (std::abs(base_length - target_length) < base_length * ratio_threshold) {
+  //        tmp_parallel_contours.push_back(parallel_contours.at(k));
+  //      }
+  //    }
+
+  //    if (tmp_parallel_contours.size() > max_parallel_contours.size()) {
+  //      max_parallel_contours = tmp_parallel_contours;
+  //    }
+  //  }
+
+  //  if (max_parallel_contours.size() >= minimum_bar_num) {
+  //    new_parallel_contours.push_back(max_parallel_contours);
+  //  }
+  //}
 
   return new_parallel_contours;
 }
@@ -441,7 +475,7 @@ cv::Mat BarcodeDetector2::drawContourGroup(const cv::Mat& image, const std::vect
 }
 
 std::vector<cv::Point2f> BarcodeDetector2::detect(const cv::Mat& image) const {
-  bool draw_image_flag = false;
+  bool draw_image_flag = true;
 
   // 前処理
   // グレースケール変換
