@@ -170,20 +170,6 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParalle
     const cv::Vec2d base_vector(base_center_point2 - base_center_point1);
 
     const BarcodeDetector2::Direction direction = get_direction(contours.at(i));
-    //if (direction == Direction::Vertical) {
-    //  const double cos_theta = base_vector.dot(cv::Vec2d(1.0, 0.0)) / (cv::norm(base_vector));
-    //  const double radian = std::acos(cos_theta);
-    //  if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
-    //    continue;
-    //  }
-    //} else {
-    //  const double cos_theta = base_vector.dot(cv::Vec2d(0.0, 1.0)) / (cv::norm(base_vector));
-    //  const double radian = std::acos(cos_theta);
-    //  if ((45.0 * (M_PI / 180.0) < radian && radian < 135.0 * (M_PI / 180.0))) {
-    //    continue;
-    //  }
-    //}
-
     std::vector<std::vector<cv::Point>> parallel_contours{ contours.at(i), contours.at(i + 1) };
     for (uint j = 0; j < contours.size(); j++) {
       if (i == j || i + 1 == j) {
@@ -231,16 +217,21 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLen
   std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
   for (const auto& parallel_contours : all_parallel_contours) {
 
+    std::vector<double> bar_length_list(parallel_contours.size());
+    for (uint i = 0; i < parallel_contours.size(); i++) {
+      bar_length_list[i] = (getBarLength(parallel_contours.at(i)));
+    }
+
     std::vector<std::vector<cv::Point>> max_parallel_contours;
     for (uint i = 0; i < parallel_contours.size(); i++) {
-      double base_length = getBarLength(parallel_contours.at(i));
+      double base_length = bar_length_list.at(i);
       std::vector<std::vector<cv::Point>> tmp_parallel_contours{ parallel_contours.at(i) };
       for (uint j = 0; j < parallel_contours.size(); j++) {
         if (i == j) {
           continue;
         }
         
-        double target_length = getBarLength(parallel_contours.at(j));
+        double target_length = bar_length_list.at(j);
         if (std::abs(base_length - target_length) < base_length * ratio_threshold) {
           tmp_parallel_contours.push_back(parallel_contours.at(j));
         }
