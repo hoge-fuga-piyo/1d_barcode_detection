@@ -29,21 +29,25 @@ std::vector<std::vector<cv::Point>> BarcodeDetector2::contoursDetection(const cv
 }
 
 std::array<cv::Point, 4> BarcodeDetector2::getMinMaxPoint(const std::vector<cv::Point>& contour) const {
-  cv::Point max_x_point = *std::max_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
-    return p1.x < p2.x;
-  });
-
-  cv::Point min_x_point = *std::min_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
-    return p1.x < p2.x;
-  });
-
-  cv::Point max_y_point = *std::max_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
-    return p1.y < p2.y;
-  });
-
-  cv::Point min_y_point = *std::min_element(contour.begin(), contour.end(), [](const cv::Point& p1, const cv::Point& p2) {
-    return p1.y < p2.y;
-  });
+  // 可読性の観点だとstd::max_element, std::min_element使いたいが、計算量削減のためfor loopにする
+  cv::Point min_x_point = contour.at(0);
+  cv::Point max_x_point = contour.at(0);
+  cv::Point min_y_point = contour.at(0);
+  cv::Point max_y_point = contour.at(0);
+  for (uint i = 1; i < contour.size(); i++) {
+    if (min_x_point.x > contour.at(i).x) {
+      min_x_point = contour.at(i);
+    }
+    if (max_x_point.x < contour.at(i).x) {
+      max_x_point = contour.at(i);
+    }
+    if (min_y_point.y > contour.at(i).y) {
+      min_y_point = contour.at(i);
+    }
+    if (max_y_point.y < contour.at(i).y) {
+      max_y_point = contour.at(i);
+    }
+  }
 
   return std::array<cv::Point, 4>{
     min_x_point, 
