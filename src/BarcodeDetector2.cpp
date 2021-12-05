@@ -261,23 +261,45 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectNearCon
   const double length_ratio_threshold = 0.5;
   const int near_bar_num_threshold = 2;
 
+  std::vector<std::vector<double>> all_bar_length_list(all_parallel_contours.size());
+  for (uint i = 0; i < all_parallel_contours.size(); i++) {
+    std::vector<double> tmp_bar_length_list(all_parallel_contours.at(i).size());
+    for (uint j = 0; j < all_parallel_contours.at(i).size(); j++) {
+      tmp_bar_length_list[j] = getBarLength(all_parallel_contours.at(i).at(j));
+    }
+    all_bar_length_list[i] = tmp_bar_length_list;
+  }
+
+  std::vector<std::vector<cv::Point2d>> all_bar_center_list(all_parallel_contours.size());
+  for (uint i = 0; i < all_parallel_contours.size(); i++) {
+    std::vector<cv::Point2d> tmp_bar_center_list(all_parallel_contours.at(i).size());
+    for (uint j = 0; j < all_parallel_contours.at(i).size(); j++) {
+      tmp_bar_center_list[j] = getCenter(all_parallel_contours.at(i).at(j));
+    }
+    all_bar_center_list[i] = tmp_bar_center_list;
+  }
+
   std::vector<std::vector<std::vector<cv::Point>>> new_all_parallel_contours;
-  for (const auto& parallel_contours : all_parallel_contours) {
+  for (uint i = 0; i < all_parallel_contours.size(); i++) {
+    const std::vector<std::vector<cv::Point>>& parallel_contours = all_parallel_contours[i];
+    const std::vector<double>& bar_length_list = all_bar_length_list[i];
+    const std::vector<cv::Point2d>& bar_center_list = all_bar_center_list[i];
+
     std::vector<std::vector<cv::Point>> new_parallel_contours;
     int near_bar_num = 0;
-    for (uint i = 0; i < parallel_contours.size(); i++) {
-      const cv::Point2d base_center = getCenter(parallel_contours.at(i));
-      const double base_length = getBarLength(parallel_contours.at(i));
-      for (uint j = 0; j < parallel_contours.size(); j++) {
-        if (i == j) {
+    for (uint j = 0; j < parallel_contours.size(); j++) {
+      const cv::Point2d base_center = bar_center_list.at(j);
+      const double base_length = bar_length_list.at(j);
+      for (uint k = 0; k < parallel_contours.size(); k++) {
+        if (j == k) {
           continue;
         }
 
-        const cv::Point2d target_center = getCenter(parallel_contours.at(j));
+        const cv::Point2d target_center = bar_center_list.at(k);
         if (cv::norm(base_center - target_center) < base_length * length_ratio_threshold) {
           near_bar_num++;
           if (near_bar_num >= near_bar_num_threshold) {
-            new_parallel_contours.push_back(parallel_contours.at(i));
+            new_parallel_contours.push_back(parallel_contours.at(j));
           }
           break;
         }
