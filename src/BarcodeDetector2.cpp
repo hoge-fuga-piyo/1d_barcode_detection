@@ -163,23 +163,33 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParalle
     }
   };
 
+  std::vector<Direction> direction_list(contours.size());
+  for (uint i = 0; i < contours.size(); i++) {
+    direction_list[i] = get_direction(contours.at(i));
+  }
+
+  std::vector<cv::Point2d> center_list(contours.size());
+  for (uint i = 0; i < contours.size(); i++) {
+    center_list[i] = getCenter(contours.at(i));
+  }
+
   std::vector<std::vector<std::vector<cv::Point>>> all_parallel_contours;
   for (uint i = 0; i < contours.size() - 1; i++) {
-    const cv::Point2d base_center_point1 = getCenter(contours.at(i));
-    const cv::Point2d base_center_point2 = getCenter(contours.at(i + 1));
+    const cv::Point2d base_center_point1 = center_list.at(i);
+    const cv::Point2d base_center_point2 = center_list.at(i + 1);
     const cv::Vec2d base_vector(base_center_point2 - base_center_point1);
 
-    const BarcodeDetector2::Direction direction = get_direction(contours.at(i));
+    const BarcodeDetector2::Direction direction = direction_list.at(i);
     std::vector<std::vector<cv::Point>> parallel_contours{ contours.at(i), contours.at(i + 1) };
     for (uint j = 0; j < contours.size(); j++) {
       if (i == j || i + 1 == j) {
         continue;
       }
-      if (direction != get_direction(contours.at(j))) {
+      if (direction != direction_list.at(j)) {
         continue;
       }
 
-      const cv::Vec2d target_vector(getCenter(contours.at(j)) - base_center_point1);
+      const cv::Vec2d target_vector(center_list.at(j) - base_center_point1);
       const double cos_theta = base_vector.dot(target_vector) / (cv::norm(base_vector) * cv::norm(target_vector));
       const double radian = std::acos(cos_theta);
       if (radian < radian_threshold || (180.0 - radian) < radian_threshold) {
