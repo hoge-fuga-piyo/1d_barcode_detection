@@ -173,9 +173,34 @@ std::vector<std::vector<cv::Point>> BarcodeDetector2::removeLargeContours(int im
   return dst_contours;
 }
 
+std::vector<std::vector<cv::Point>> BarcodeDetector2::removeNotBarRect(const std::vector<std::vector<cv::Point>>& contours) const {
+  double ratio_threshold = 0.3;
+
+  std::vector<std::vector<cv::Point>> dst_contours;
+  for (const auto& contour : contours) {
+    const cv::RotatedRect rect = cv::minAreaRect(contour);
+    cv::Point2f corner[4];
+    rect.points(corner);
+
+    // bottomLeft to topLeft
+    const double line_len1 = cv::norm(corner[0] - corner[1]);
+
+    // topLeft to topRight
+    const double line_len2 = cv::norm(corner[1] - corner[2]);
+
+    const double ratio = line_len1 > line_len2 ? line_len2 / line_len1 : line_len1 / line_len2;
+    if (ratio < ratio_threshold) {
+      dst_contours.push_back(contour);
+    }
+  }
+
+  return dst_contours;
+}
+
 std::vector<std::vector<cv::Point>> BarcodeDetector2::removeInvalidContours(int image_largest_length, const std::vector<std::vector<cv::Point>>& contours) const {
   std::vector<std::vector<cv::Point>> dst_contours = removeSmallContours(image_largest_length, contours);
   dst_contours = removeLargeContours(image_largest_length, dst_contours);
+  dst_contours = removeNotBarRect(dst_contours);
 
   return dst_contours;
 }

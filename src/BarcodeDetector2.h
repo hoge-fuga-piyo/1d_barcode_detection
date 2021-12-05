@@ -26,6 +26,7 @@ private:
   std::array<cv::Point, 4> getMinMaxPoint(const std::vector<std::vector<cv::Point>>& contours) const;
   std::vector<std::vector<cv::Point>> removeSmallContours(int image_large_length, const std::vector<std::vector<cv::Point>>& contours) const;
   std::vector<std::vector<cv::Point>> removeLargeContours(int image_large_length, const std::vector<std::vector<cv::Point>>& contours) const;
+  std::vector<std::vector<cv::Point>> removeNotBarRect(const std::vector<std::vector<cv::Point>>& contours) const;
   std::vector<std::vector<cv::Point>> removeInvalidContours(int image_large_length, const std::vector<std::vector<cv::Point>>& contours) const;
   cv::Point2d getCenter(const std::vector<cv::Point>& contour) const;
   double getBarLength(const std::vector<cv::Point>& contour) const;
