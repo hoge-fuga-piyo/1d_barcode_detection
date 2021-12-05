@@ -6,6 +6,46 @@
 
 BarcodeDetector2::BarcodeDetector2() : detect_num(2), minimum_bar_num(5) {}
 
+void BarcodeDetector2::computeContoursInfo(const std::vector<std::vector<cv::Point>>& contours) {
+  auto get_direction = [](const std::array<cv::Point, 4>& min_max_point) {
+    const cv::Point min_x_point = min_max_point.at(0);
+    const cv::Point max_x_point = min_max_point.at(1);
+    const cv::Point min_y_point = min_max_point.at(2);
+    const cv::Point max_y_point = min_max_point.at(3);
+
+    if (max_x_point.x - min_x_point.x > max_y_point.y - min_y_point.y) {
+      return Direction::Horizontal;
+    } else {
+      return Direction::Vertical;
+    }
+  };
+
+  auto get_center = [](const std::array<cv::Point, 4>& min_max_point) {
+    const cv::Point min_x_point = min_max_point.at(0);
+    const cv::Point max_x_point = min_max_point.at(1);
+    const cv::Point min_y_point = min_max_point.at(2);
+    const cv::Point max_y_point = min_max_point.at(3);
+
+    const double x = (min_x_point.x + max_x_point.x) / 2.0;
+    const double y = (min_y_point.y + max_y_point.y) / 2.0;
+
+    return cv::Point2d(x, y);
+  };
+
+  min_max_point.clear();
+  contour_directions.clear();
+  contour_centers.clear();
+  min_max_point.reserve(contours.size());
+  contour_directions.reserve(contours.size());
+  contour_centers.reserve(contours.size());
+  for (const auto& contour : contours) {
+    auto tmp_min_max_point = getMinMaxPoint(contour);
+    min_max_point.push_back(tmp_min_max_point);
+    contour_directions.push_back(get_direction(tmp_min_max_point));
+    contour_centers.push_back(get_center(tmp_min_max_point));
+  }
+}
+
 cv::Mat BarcodeDetector2::preprocess(const cv::Mat& gray_image) const {
   // DoGフィルタでエッジ抽出
   cv::Mat gaussian_small, gaussian_large;
@@ -93,8 +133,8 @@ std::array<cv::Point, 4> BarcodeDetector2::getMinMaxPoint(const std::vector<std:
   };
 }
 
-std::vector<std::vector<cv::Point>> BarcodeDetector2::removeSmallContours(const std::vector<std::vector<cv::Point>>& contours) const {
-  const int threshold = 20;
+std::vector<std::vector<cv::Point>> BarcodeDetector2::removeSmallContours(int image_large_length, const std::vector<std::vector<cv::Point>>& contours) const {
+  const int threshold = image_large_length * 0.02;
 
   std::vector<std::vector<cv::Point>> dst_contours;
   for (const auto& contour : contours) {
@@ -105,7 +145,7 @@ std::vector<std::vector<cv::Point>> BarcodeDetector2::removeSmallContours(const 
     const cv::Point max_y_point = min_max_point.at(3);
 
     const int length = max_x_point.x - min_x_point.x > max_y_point.y - min_y_point.y ? (max_x_point.x - min_x_point.x) : (max_y_point.y - min_y_point.y);
-    if (length > 20) {
+    if (length > threshold) {
       dst_contours.push_back(contour);
     }
   }
@@ -113,8 +153,29 @@ std::vector<std::vector<cv::Point>> BarcodeDetector2::removeSmallContours(const 
   return dst_contours;
 }
 
-std::vector<std::vector<cv::Point>> BarcodeDetector2::removeInvalidContours(const std::vector<std::vector<cv::Point>>& contours) const {
-  std::vector<std::vector<cv::Point>> dst_contours = removeSmallContours(contours);
+std::vector<std::vector<cv::Point>> BarcodeDetector2::removeLargeContours(int image_large_length, const std::vector<std::vector<cv::Point>>& contours) const {
+  const int threshold = image_large_length * 0.9;
+
+  std::vector<std::vector<cv::Point>> dst_contours;
+  for (const auto& contour : contours) {
+    const auto min_max_point = getMinMaxPoint(contour);
+    const cv::Point min_x_point = min_max_point.at(0);
+    const cv::Point max_x_point = min_max_point.at(1);
+    const cv::Point min_y_point = min_max_point.at(2);
+    const cv::Point max_y_point = min_max_point.at(3);
+
+    const int length = max_x_point.x - min_x_point.x > max_y_point.y - min_y_point.y ? (max_x_point.x - min_x_point.x) : (max_y_point.y - min_y_point.y);
+    if (length < threshold) {
+      dst_contours.push_back(contour);
+    }
+  }
+
+  return dst_contours;
+}
+
+std::vector<std::vector<cv::Point>> BarcodeDetector2::removeInvalidContours(int image_largest_length, const std::vector<std::vector<cv::Point>>& contours) const {
+  std::vector<std::vector<cv::Point>> dst_contours = removeSmallContours(image_largest_length, contours);
+  dst_contours = removeLargeContours(image_largest_length, dst_contours);
 
   return dst_contours;
 }
@@ -149,50 +210,28 @@ double BarcodeDetector2::getBarLength(const std::vector<cv::Point>& contour) con
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParallelContours(const std::vector<std::vector<cv::Point>>& contours) const {
   const double radian_threshold = 10.0 * (M_PI / 180.0);
 
-  auto get_direction = [&](const std::vector<cv::Point>& contour) {
-    const auto min_max_point = getMinMaxPoint(contour);
-    const cv::Point min_x_point = min_max_point.at(0);
-    const cv::Point max_x_point = min_max_point.at(1);
-    const cv::Point min_y_point = min_max_point.at(2);
-    const cv::Point max_y_point = min_max_point.at(3);
-
-    if (max_x_point.x - min_x_point.x > max_y_point.y - min_y_point.y) {
-      return Direction::Horizontal;
-    } else {
-      return Direction::Vertical;
-    }
-  };
-
-  std::vector<Direction> direction_list(contours.size());
-  for (uint i = 0; i < contours.size(); i++) {
-    direction_list[i] = get_direction(contours.at(i));
-  }
-
-  std::vector<cv::Point2d> center_list(contours.size());
-  for (uint i = 0; i < contours.size(); i++) {
-    center_list[i] = getCenter(contours.at(i));
-  }
-
   std::vector<std::vector<std::vector<cv::Point>>> all_parallel_contours;
   for (uint i = 0; i < contours.size() - 1; i++) {
-    const cv::Point2d base_center_point1 = center_list.at(i);
-    const cv::Point2d base_center_point2 = center_list.at(i + 1);
-    const cv::Vec2d base_vector(base_center_point2 - base_center_point1);
+    const cv::Point2d& base_center_point1 = contour_centers[i];
+    const cv::Point2d& base_center_point2 = contour_centers[i + 1];
+    cv::Vec2d base_vector(base_center_point2 - base_center_point1);
+    const double base_vec_norm = cv::norm(base_vector);
+    base_vector = base_vector / base_vec_norm;
 
-    const BarcodeDetector2::Direction direction = direction_list.at(i);
+    const BarcodeDetector2::Direction direction = contour_directions.at(i);
     std::vector<std::vector<cv::Point>> parallel_contours{ contours.at(i), contours.at(i + 1) };
     for (uint j = 0; j < contours.size(); j++) {
       if (i == j || i + 1 == j) {
         continue;
       }
-      if (direction != direction_list.at(j)) {
+      if (direction != contour_directions.at(j)) {
         continue;
       }
 
-      const cv::Vec2d target_vector(center_list.at(j) - base_center_point1);
-      const double cos_theta = base_vector.dot(target_vector) / (cv::norm(base_vector) * cv::norm(target_vector));
+      const cv::Vec2d target_vector(contour_centers.at(j) - base_center_point1);
+      const double cos_theta = base_vector.dot(target_vector) / cv::norm(target_vector);
       const double radian = std::acos(cos_theta);
-      if (radian < radian_threshold || (180.0 - radian) < radian_threshold) {
+      if (radian < radian_threshold || (M_PI - radian) < radian_threshold) {
         parallel_contours.push_back(contours.at(j));
       }
     }
@@ -222,10 +261,10 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParalle
 }
 
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLengthContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
-  const double ratio_threshold = 0.7;
+  const double ratio_threshold = 0.3;
+  //const double ratio_threshold = 0.7;
 
   std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
-  //std::vector<std::vector<std::tuple<double, uint>>> all_bar_length_list(all_parallel_contours.size());
   for (uint i = 0; i < all_parallel_contours.size(); i++) {
     std::vector<std::tuple<double, uint>> tmp_bar_length_list(all_parallel_contours.at(i).size());
     for (uint j = 0; j < all_parallel_contours.at(i).size(); j++) {
@@ -249,6 +288,7 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLen
       for (int k = j + 1; k < tmp_bar_length_list.size(); k++) {
         double target_length = std::get<0>(tmp_bar_length_list.at(k));
         if (base_length - target_length < base_length * ratio_threshold) {
+        //if (target_length / base_length >= ratio_threshold) {
           contours.push_back(all_parallel_contours.at(i).at(k));
         } else {
           break;
@@ -474,7 +514,7 @@ cv::Mat BarcodeDetector2::drawContourGroup(const cv::Mat& image, const std::vect
   return dst_image;
 }
 
-std::vector<cv::Point2f> BarcodeDetector2::detect(const cv::Mat& image) const {
+std::vector<cv::Point2f> BarcodeDetector2::detect(const cv::Mat& image) {
   bool draw_image_flag = true;
 
   // 前処理
@@ -482,13 +522,13 @@ std::vector<cv::Point2f> BarcodeDetector2::detect(const cv::Mat& image) const {
   auto start = std::chrono::system_clock::now();
   cv::Mat gray_image;
   cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
-  cv::Mat filtered_image = preprocess(gray_image);
+  const cv::Mat filtered_image = preprocess(gray_image);
   auto end = std::chrono::system_clock::now();
   std::cout << "preprocess : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   // 輪郭抽出
   start = std::chrono::system_clock::now();
-  std::vector<std::vector<cv::Point>> contours = contoursDetection(filtered_image);
+  contours = contoursDetection(filtered_image);
   end = std::chrono::system_clock::now();
   std::cout << "find contours : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
@@ -500,7 +540,8 @@ std::vector<cv::Point2f> BarcodeDetector2::detect(const cv::Mat& image) const {
 
   // 不要な輪郭を削除
   start = std::chrono::system_clock::now();
-  contours = removeInvalidContours(contours);
+  const int image_length = image.rows > image.cols ? image.rows : image.cols;
+  contours = removeInvalidContours(image_length, contours);
   end = std::chrono::system_clock::now();
   std::cout << "remove short contours : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
@@ -509,6 +550,12 @@ std::vector<cv::Point2f> BarcodeDetector2::detect(const cv::Mat& image) const {
     cv::drawContours(draw_image, contours, -1, cv::Scalar(0, 0, 255));
     cv::imshow("draw2", draw_image);
   }
+
+  // 輪郭の各種情報を計算
+  start = std::chrono::system_clock::now();
+  computeContoursInfo(contours);
+  end = std::chrono::system_clock::now();
+  std::cout << "contours info : " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
   // 平行な輪郭ごとに分ける
   start = std::chrono::system_clock::now();
