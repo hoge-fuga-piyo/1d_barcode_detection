@@ -214,26 +214,33 @@ std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectParalle
 std::vector<std::vector<std::vector<cv::Point>>> BarcodeDetector2::detectSameLengthContours(const std::vector<std::vector<std::vector<cv::Point>>>& all_parallel_contours) const {
   const double ratio_threshold = 0.7;
 
-  std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
-  for (const auto& parallel_contours : all_parallel_contours) {
-
-    std::vector<double> bar_length_list(parallel_contours.size());
-    for (uint i = 0; i < parallel_contours.size(); i++) {
-      bar_length_list[i] = (getBarLength(parallel_contours.at(i)));
+  std::vector<std::vector<double>> all_bar_length_list(all_parallel_contours.size());
+  for (uint i = 0; i < all_parallel_contours.size(); i++) {
+    std::vector<double> tmp_bar_length_list(all_parallel_contours.at(i).size());
+    for (uint j = 0; j < all_parallel_contours.at(i).size(); j++) {
+      tmp_bar_length_list[j] = (getBarLength(all_parallel_contours.at(i).at(j)));
     }
+    all_bar_length_list[i] = tmp_bar_length_list;
+  }
+
+  std::vector<std::vector<std::vector<cv::Point>>> new_parallel_contours;
+  for (uint i = 0; i < all_parallel_contours.size(); i++) {
+    const std::vector<std::vector<cv::Point>>& parallel_contours = all_parallel_contours[i];
+    const std::vector<double>& bar_length_list = all_bar_length_list[i];
 
     std::vector<std::vector<cv::Point>> max_parallel_contours;
-    for (uint i = 0; i < parallel_contours.size(); i++) {
-      double base_length = bar_length_list.at(i);
-      std::vector<std::vector<cv::Point>> tmp_parallel_contours{ parallel_contours.at(i) };
-      for (uint j = 0; j < parallel_contours.size(); j++) {
-        if (i == j) {
+    for (uint j = 0; j < parallel_contours.size(); j++) {
+      double base_length = bar_length_list.at(j);
+      std::vector<std::vector<cv::Point>> tmp_parallel_contours{ parallel_contours.at(j) };
+      tmp_parallel_contours.reserve(parallel_contours.size());
+      for (uint k = 0; k < parallel_contours.size(); k++) {
+        if (j == k) {
           continue;
         }
         
-        double target_length = bar_length_list.at(j);
+        double target_length = bar_length_list.at(k);
         if (std::abs(base_length - target_length) < base_length * ratio_threshold) {
-          tmp_parallel_contours.push_back(parallel_contours.at(j));
+          tmp_parallel_contours.push_back(parallel_contours.at(k));
         }
       }
 
