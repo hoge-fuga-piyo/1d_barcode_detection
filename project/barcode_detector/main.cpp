@@ -4,21 +4,32 @@
 
 #include "BarcodeDetector.h"
 #include "BarcodeDetector2.h"
+#include "BarcodeDetector3.h"
+#include "BarcodeDetector4.h"
 #include "DefaultBarcodeDetector.h"
 
 int main() {
 	//cv::Mat image = cv::imread("../../../data/test.jpg");
-	cv::Mat image = cv::imread("../../../data/test2.jpg");
+	//cv::Mat image = cv::imread("../../../data/test2.jpg");
 	//cv::Mat image = cv::imread("../../../data/test3.jpg");
 	//cv::Mat image = cv::imread("../../../data/test4.jpg");
 	//cv::Mat image = cv::imread("../../../data/test5.jpg");
 	//cv::Mat image = cv::imread("../../../data/test6.jpg");
+	//cv::Mat image = cv::imread("../../../data/test7.jpg");
+	//cv::Mat image = cv::imread("../../../data/test8.jpg");
+	//cv::Mat image = cv::imread("../../../data/test9.jpg");
 	//cv::Mat image = cv::imread("../../../data/test10.jpg");
+	//cv::Mat image = cv::imread("../../../data/test11.jpg");
+	//cv::Mat image = cv::imread("../../../data/test12.jpg");
+	//cv::Mat image = cv::imread("../../../data/test13.jpg");
+	//cv::Mat image = cv::imread("../../../data/test14.jpg");
 	//cv::Mat image = cv::imread("../../../data/test15.jpg");
 	//cv::Mat image = cv::imread("../../../data/test16.jpg");
 	//cv::Mat image = cv::imread("../../../data/test17.jpg");
 	//cv::Mat image = cv::imread("../../../data/test18.jpg");
+	//cv::Mat image = cv::imread("../../../data/test19.jpg");
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
+	cv::Mat image = cv::imread("../../../data/test21.jpg");
 
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 	//cv::Mat image = cv::imread("../../../data/test13.jpg");
@@ -29,8 +40,10 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 
 	const bool use_original_decoder = false;
-	const bool use_default_decoder = true;
-	const bool use_original_decoder2 = true;
+	const bool use_default_decoder = false;
+	const bool use_original_decoder2 = false;
+	const bool use_original_decoder3 = false;
+	const bool use_original_decoder4 = true;
 
 	// バーコード検出
 	if (use_original_decoder) {
@@ -112,6 +125,35 @@ int main() {
 		} else {
 			std::cout << "Failed to decode" << std::endl;
 		}
+
+	}
+
+	if (use_original_decoder3) {
+		std::cout << "============================================" << std::endl;
+		std::cout << "=  OpenCV default detector with preprocess2 =" << std::endl;
+		std::cout << "============================================" << std::endl;
+
+		// バーコード検出
+		BarcodeDetector3 detector;
+		std::vector<cv::Point2f> corners = detector.detect(image);
+		if (corners.size() > 0) {
+			std::cout << "Find barcodes: " << corners.size() / 4 << std::endl;
+		} else {
+			std::cout << "Cannot find barcodes" << std::endl;
+		}
+	}
+
+	if (use_original_decoder4) {
+		// バーコード検出
+		BarcodeDetector4 detector;
+		std::vector<std::array<cv::Point, 4>> corners = detector.detect(image);
+		detector.decode(corners);
+		if (corners.size() > 0) {
+			std::cout << "Find barcodes: " << corners.size() / 4 << std::endl;
+		} else {
+			std::cout << "Cannot find barcodes" << std::endl;
+		}
+
 
 	}
 

@@ -178,6 +178,9 @@ std::vector<std::vector<cv::Point>> BarcodeDetector2::removeNotBarRect(const std
 
   std::vector<std::vector<cv::Point>> dst_contours;
   for (const auto& contour : contours) {
+    //
+    // 外接する矩形の長辺と短辺の比を導出して、長辺の方が明らかに長ければバーコードっぽい矩形とみなす
+    //
     const cv::RotatedRect rect = cv::minAreaRect(contour);
     cv::Point2f corner[4];
     rect.points(corner);
@@ -192,6 +195,37 @@ std::vector<std::vector<cv::Point>> BarcodeDetector2::removeNotBarRect(const std
     if (ratio < ratio_threshold) {
       dst_contours.push_back(contour);
     }
+
+    ////
+    //// 輪郭の重心を
+    ////
+    //cv::Moments moment = cv::moments(contour, false);
+    //double mx = moment.m10 / moment.m00;
+    //double my = moment.m01 / moment.m00;
+
+    //std::array<double, 4> x_array{
+    //  corner[0].x,
+    //  corner[1].x,
+    //  corner[2].x,
+    //  corner[3].x
+    //};
+    //std::array<double, 4> y_array{
+    //  corner[0].y,
+    //  corner[1].y,
+    //  corner[2].y,
+    //  corner[3].y
+    //};
+
+    //double max_x = *std::max_element(x_array.begin(), x_array.end());
+    //double min_x = *std::min_element(x_array.begin(), x_array.end());
+    //double max_y = *std::max_element(y_array.begin(), y_array.end());
+    //double min_y = *std::min_element(y_array.begin(), y_array.end());
+
+    //double cx = (min_x + max_x) / 2.0;
+    //double cy = (min_y + max_y) / 2.0;
+    //double diff = cv::norm(cv::Point2d(mx, my) - cv::Point2d(cx, cy));
+    //std::cout << diff << " : " << line_len1 << ", " << line_len2 << std::endl;
+
   }
 
   return dst_contours;
