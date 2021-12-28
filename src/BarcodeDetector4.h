@@ -14,6 +14,8 @@ private:
 	std::vector<std::array<cv::Point, 4>> barcodeRectDetection(const cv::Mat& gray_image, const std::vector<std::vector<cv::Point>>& contours) const;
 
 	// for decode
+	double digitStartPoint(int digit_index, int barcode_start_point, int base_width) const;
+	double base_width(const cv::Point& ol, const cv::Point& or ) const;
 	void decode(const std::array<cv::Point, 4>& corner) const;
 public:
 	std::vector<std::array<cv::Point, 4>> detect(const cv::Mat& image) const;

@@ -154,6 +154,17 @@ std::vector<std::array<cv::Point, 4>> BarcodeDetector4::barcodeRectDetection(con
 	return result_corners;
 }
 
+double BarcodeDetector4::digitStartPoint(int digit_index, int barcode_start_point, int base_width) const {
+	double o = barcode_start_point + (3 * base_width) + (7 * base_width * (digit_index));
+
+	return o;
+}
+
+double BarcodeDetector4::base_width(const cv::Point& ol, const cv::Point& or ) const {
+	double w = (or.x - ol.x) / 95.0;
+	return w;
+}
+
 void BarcodeDetector4::decode(const std::array<cv::Point, 4>& corner) const {
 	const cv::Point center = (corner[0] + corner[2]) * 0.5;
 	const cv::Point ol = cv::Point(corner[0].x, center.y);
