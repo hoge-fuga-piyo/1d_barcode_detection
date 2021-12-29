@@ -1,5 +1,9 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
 #include "BarcodeDetector5.h"
 #include <opencv2/flann.hpp>
+
+BarcodeDetector5::BarcodeDetector5(): min_barcode_bar_num(5) {}
 
 std::tuple<std::vector<cv::Rect>, std::vector<std::vector<cv::Point>>> BarcodeDetector5::detectMserRegions(const cv::Mat& gray_image) const {
 	cv::Ptr<cv::MSER> mser = cv::MSER::create();
@@ -151,7 +155,7 @@ std::vector<std::vector<Bar5>> BarcodeDetector5::removeOutlierPositionBars(const
 			bar_centers.push_back(bar.getCenter());
 		}
 
-		// k-meansで2つのクラスタに分けて、2つのクラスタ間の距離が一定以上なら片方のクラスタを外れ値とみなす
+		// k-meansで2つのクラスタに分けて、2つのクラスタ内の点の最小距離が一定以上なら片方のクラスタを外れ値とみなす
 		const int cluster_num = 2;
 		const cv::TermCriteria criteria(cv::TermCriteria::EPS, 0, 0.01);
 		cv::Mat1i labels;
@@ -161,20 +165,36 @@ std::vector<std::vector<Bar5>> BarcodeDetector5::removeOutlierPositionBars(const
 		cv::Point2f center1 = centroids.row(0);
 		cv::Point2f center2 = centroids.row(1);
 
-		std::vector<Bar5> new_clustered_bars;
-		const double distance = cv::norm(center1 - center2);
-		if (distance > largest_bar_length * 1.0) {
-			// 要素の少ない方のクラスタは外れ値とみなす
-			std::vector<Bar5> bars_cluster0;
-			std::vector<Bar5> bars_cluster1;
-			for (int i = 0; i < bar_centers.size(); i++) {
-				if (labels(i, 0) == 0) {
-					bars_cluster0.push_back(clustered_bars.at(i));
-				} else {
-					bars_cluster1.push_back(clustered_bars.at(i));
+		// クラスタごとに分ける
+		std::vector<Bar5> bars_cluster0;
+		std::vector<Bar5> bars_cluster1;
+		for (int i = 0; i < bar_centers.size(); i++) {
+			if (labels(i, 0) == 0) {
+				bars_cluster0.push_back(clustered_bars.at(i));
+			} else {
+				bars_cluster1.push_back(clustered_bars.at(i));
+			}
+		}
+		
+		// 最小距離が一定以上かどうかの判定
+		bool is_far = true;
+		for (const auto& bar1 : bars_cluster0) {
+			for (const auto& bar2 : bars_cluster1) {
+				const double distance = cv::norm(bar1.getCenter() - bar2.getCenter());
+				if (distance < largest_bar_length * 1.0) {
+					is_far = false;
+					break;
 				}
 			}
 
+			if (!is_far) {
+				break;
+			}
+		}
+
+		// 片方のクラスタは外れ値
+		std::vector<Bar5> new_clustered_bars;
+		if (is_far) {
 			if (bars_cluster0.size() > bars_cluster1.size()) {
 				new_clustered_bars = bars_cluster0;
 			} else {
@@ -183,6 +203,11 @@ std::vector<std::vector<Bar5>> BarcodeDetector5::removeOutlierPositionBars(const
 		} else {
 			new_clustered_bars = clustered_bars;
 		}
+
+		if (new_clustered_bars.size() < min_barcode_bar_num) {
+			continue;
+		}
+
 		dst_bars.push_back(new_clustered_bars);
 	}
 
@@ -237,8 +262,9 @@ std::vector<std::vector<Bar5>> BarcodeDetector5::removeInvalidBars(const std::ve
 	return dst_bars;
 }
 
-std::vector<std::array<cv::Point2f, 4>> BarcodeDetector5::mergeBars(const std::vector<std::vector<Bar5>>& bars) const {
+std::vector<cv::RotatedRect> BarcodeDetector5::mergeBars(const std::vector<std::vector<Bar5>>& bars) const {
 	std::vector<std::array<cv::Point2f, 4>> barcode_corners;
+	std::vector<cv::RotatedRect> barcode_rect;
 	for (const auto& clustered_bars : bars) {
 		std::vector<cv::Point> merged_region;
 		for (const auto& bar : clustered_bars) {
@@ -246,18 +272,157 @@ std::vector<std::array<cv::Point2f, 4>> BarcodeDetector5::mergeBars(const std::v
 			merged_region.insert(merged_region.end(), region.begin(), region.end());
 		}
 		cv::RotatedRect rotated_rect = cv::minAreaRect(merged_region);
-		cv::Point2f corner[4];
-		rotated_rect.points(corner);
-		std::array<cv::Point2f, 4> barcode_corner{
-			corner[0],
-			corner[1],
-			corner[2],
-			corner[3]
-		};
-		barcode_corners.push_back(barcode_corner);
+		barcode_rect.push_back(rotated_rect);
 	}
 
-	return barcode_corners;
+	return barcode_rect;
+}
+
+std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const {
+	// バーコードの方向と高さと中心を導出
+	std::vector<cv::Vec2f> barcode_vectors;
+	std::vector<double> barcode_heights;
+	std::vector<cv::Point2f> barcode_centers;
+	for (int i = 0; i < barcodes.size(); i++) {
+		cv::Point2f corner[4];
+		barcodes[i].points(corner);
+		const cv::Vec2f vector1 = corner[0] - corner[1]; // topLeft to bottomLeft
+		const cv::Vec2f vector2 = corner[2] - corner[1]; // topLeft to topRight
+
+		// 方向
+		const cv::Vec2f bar_vector = bars.at(i).at(0).getBarDirectionVector();
+		const double cos_theta1 = bar_vector.dot(vector1) / (cv::norm(bar_vector) * cv::norm(vector1));
+		double radian1 = std::acos(cos_theta1);
+		if (radian1 > M_PI / 2.0) {
+			radian1 = M_PI - radian1;
+		}
+		const double cos_theta2 = bar_vector.dot(vector2) / (cv::norm(bar_vector) * cv::norm(vector2));
+		double radian2 = std::acos(cos_theta2);
+		if (radian2 > M_PI / 2.0) {
+			radian2 = M_PI - radian2;
+		}
+
+		const cv::Vec2f barcode_vector = radian1 > radian2 ? vector2 : vector1;
+		barcode_vectors.push_back(barcode_vector);
+
+		// 高さ
+		const double height = radian1 > radian2 ? cv::norm(vector1) : cv::norm(vector2);
+		barcode_heights.push_back(height);
+
+		// 中心
+		const cv::Point2f center = (corner[0] + corner[2]) * 0.5;
+		barcode_centers.push_back(center);
+	}
+
+	// バーコードの結合
+	std::vector<int> concat_map(barcodes.size(), -1);
+	int new_barcode_index = 0;
+	for (int i = 0; i < barcodes.size(); i++) {
+		bool find_new_concat = false;
+		for (int j = i + 1; j < barcodes.size(); j++) {
+			// 既に結合判定済みならスキップ
+			if (concat_map.at(i) > 0 && concat_map.at(j)) {
+				continue;
+			}
+
+			//// バーコード同士の高さの差が一定以上なら結合しない
+			//const double large_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(i) : barcode_heights.at(j);
+			//const double short_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(j) : barcode_heights.at(i);
+			//if (short_height / large_height < 0.8) {
+			//	continue;
+			//}
+
+			//// バーコード同士の角度の差が一定以上なら結合しない
+			//const double radian_threshold1 = 10.0 * (M_PI / 180.0);
+			//const cv::Vec2f vector1 = barcode_vectors.at(i);
+			//const cv::Vec2f vector2 = barcode_vectors.at(j);
+			//const double cos_theta = vector1.dot(vector2) / (cv::norm(vector1) * cv::norm(vector2));
+			//double radian = std::acos(cos_theta);
+			//if (radian > M_PI / 2.0) {
+			//	radian = M_PI - radian;
+			//}
+			//if (radian > radian_threshold1) {
+			//	continue;
+			//}
+
+			//// 片方のバーコードの中点からもう片方のバーコードの中点へのベクトルと、それぞれのバーコードの向きが一定以上異なれば結合しない
+			//const double radian_threshold2 = 10.0 * (M_PI / 180.0);
+			//const cv::Vec2f center2center = barcode_centers.at(j) - barcode_centers.at(i);
+			//const double cos_theta1 = center2center.dot(barcode_vectors.at(i)) / (cv::norm(center2center) * cv::norm(barcode_vectors.at(i)));
+			//double radian1 = std::acos(cos_theta1);
+			//if (radian1 > M_PI / 2.0) {
+			//	radian1 = M_PI - radian1;
+			//}
+			//const double cos_theta2 = center2center.dot(barcode_vectors.at(j)) / (cv::norm(center2center) * cv::norm(barcode_vectors.at(j)));
+			//double radian2 = std::acos(cos_theta2);
+			//if (radian2 > M_PI / 2.0) {
+			//	radian2 = M_PI - radian2;
+			//}
+			//if (radian1 > radian_threshold2 || radian2 > radian_threshold2) {
+			//	continue;
+			//}
+
+			// バーコードの領域が一定以上遠ければ結合しない
+			bool is_concat_target = false;
+			for (const auto& bar1 : bars.at(i)) {
+				for (const auto& bar2 : bars.at(j)) {
+					const double distance = cv::norm(bar1.getCenter() - bar2.getCenter());
+					if (distance < 10.0) {
+						is_concat_target = true;
+						break;
+					}
+				}
+
+				if (is_concat_target) {
+					break;
+				}
+			}
+			
+			if (is_concat_target) {
+				if (concat_map.at(i) > 0) {
+					concat_map[j] = concat_map.at(i);
+				} else if (concat_map.at(j) > 0) {
+					concat_map[i] = concat_map.at(j);
+				} else {
+					concat_map[i] = new_barcode_index;
+					concat_map[j] = new_barcode_index;
+					find_new_concat = true;
+				}
+			}
+		}
+
+		if (find_new_concat) {
+			new_barcode_index++;
+		}
+	}
+
+	for (int concat_index : concat_map) {
+		std::cout << concat_index << ", ";
+	}
+	std::cout << "" << std::endl;
+
+	std::vector<std::vector<Bar5>> new_clustered_bars;
+	for (int i = 0; i < new_barcode_index; i++) {
+		std::vector<Bar5> new_bars;
+		for (int j = 0; j < concat_map.size(); j++) {
+			if (i == concat_map.at(j)) {
+				new_bars.insert(new_bars.end(), bars.at(j).begin(), bars.at(j).end());
+			}
+		}
+		new_clustered_bars.push_back(new_bars);
+	}
+	for (int i = 0; i < concat_map.size(); i++) {
+		if (concat_map.at(i) < 0) {
+			new_clustered_bars.push_back(bars.at(i));
+		}
+	}
+
+	if (barcodes.size() == new_clustered_bars.size()) {	// 結合されたバーコードが存在しない
+		return barcodes;
+	}
+
+	// TODO 矩形の導出は結合したバーコードのものだけに絞れば計算コストを抑えられそう
+	return mergeBars(new_clustered_bars);
 }
 
 void BarcodeDetector5::detect(const cv::Mat& image) const {
@@ -402,20 +567,44 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 
 	// バーコードの領域を求める
 	start = std::chrono::system_clock::now();
-	std::vector<std::array<cv::Point2f, 4>> barcode_corners = mergeBars(clustered_bars);
+	std::vector<cv::RotatedRect> barcode_rect = mergeBars(clustered_bars);
 	end = std::chrono::system_clock::now();
 	std::cout << "barcode region: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
+	std::cout << "barcode num: " << barcode_rect.size() << std::endl;
 
 	if (is_draw_image) {
 		cv::Mat draw_image = image.clone();
-		for (const auto& corner : barcode_corners) {
-			cv::line(draw_image, corner.at(0), corner.at(1), cv::Scalar(0, 0, 255), 2);
-			cv::line(draw_image, corner.at(1), corner.at(2), cv::Scalar(0, 0, 255), 2);
-			cv::line(draw_image, corner.at(2), corner.at(3), cv::Scalar(0, 0, 255), 2);
-			cv::line(draw_image, corner.at(3), corner.at(0), cv::Scalar(0, 0, 255), 2);
+		for (const auto& rect : barcode_rect) {
+			cv::Point2f corner[4];
+			rect.points(corner);
+
+			cv::line(draw_image, corner[0], corner[1], cv::Scalar(0, 0, 255), 2);
+			cv::line(draw_image, corner[1], corner[2], cv::Scalar(0, 0, 255), 2);
+			cv::line(draw_image, corner[2], corner[3], cv::Scalar(0, 0, 255), 2);
+			cv::line(draw_image, corner[3], corner[0], cv::Scalar(0, 0, 255), 2);
 		}
 		cv::imshow("barcode", draw_image);
 	}
-}
 
-BarcodeDetector5::BarcodeDetector5(): min_barcode_bar_num(5) {}
+	// バーコードを結合する
+	start = std::chrono::system_clock::now();
+	barcode_rect = concatBarcodes(barcode_rect, clustered_bars);
+	end = std::chrono::system_clock::now();
+	std::cout << "barcode concat: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
+	std::cout << "barcode num: " << barcode_rect.size() << std::endl;
+
+	if (is_draw_image) {
+		cv::Mat draw_image = image.clone();
+		for (const auto& rect : barcode_rect) {
+			cv::Point2f corner[4];
+			rect.points(corner);
+
+			cv::line(draw_image, corner[0], corner[1], cv::Scalar(0, 0, 255), 2);
+			cv::line(draw_image, corner[1], corner[2], cv::Scalar(0, 0, 255), 2);
+			cv::line(draw_image, corner[2], corner[3], cv::Scalar(0, 0, 255), 2);
+			cv::line(draw_image, corner[3], corner[0], cv::Scalar(0, 0, 255), 2);
+		}
+		cv::imshow("barcode concat", draw_image);
+	}
+
+}

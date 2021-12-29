@@ -22,7 +22,8 @@ private:
 	std::vector<std::vector<Bar5>> removeOutlierPositionBars(const std::vector<std::vector<Bar5>>& bars) const;
 	std::vector<std::vector<Bar5>> removeOutlierLengthBars(const std::vector<std::vector<Bar5>>& bars) const;
 	std::vector<std::vector<Bar5>> removeInvalidBars(const std::vector<std::vector<Bar5>>& bars) const;
-	std::vector<std::array<cv::Point2f, 4>> mergeBars(const std::vector<std::vector<Bar5>>& bars) const;
+	std::vector<cv::RotatedRect> mergeBars(const std::vector<std::vector<Bar5>>& bars) const;
+	std::vector<cv::RotatedRect> concatBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const;
 public:
 	BarcodeDetector5();
 	void detect(const cv::Mat& image) const;

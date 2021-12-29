@@ -36,7 +36,7 @@ cv::Point2f Bar5::getCenter() const {
 
 cv::Vec2f Bar5::getVerticalVector() const {
 	// topLeft to bottomLeft
-	const cv::Vec2f vector1 = rotated_rect_corner[1] - rotated_rect_corner[0];
+	const cv::Vec2f vector1 = rotated_rect_corner[0] - rotated_rect_corner[1];
 
 	// topLeft to topRight
 	const cv::Vec2f vector2 = rotated_rect_corner[2] - rotated_rect_corner[1];
@@ -49,7 +49,7 @@ cv::Vec2f Bar5::getVerticalVector() const {
 
 cv::Vec2f Bar5::getBarDirectionVector() const {
 	// topLeft to bottomLeft
-	const cv::Vec2f vector1 = rotated_rect_corner[1] - rotated_rect_corner[0];
+	const cv::Vec2f vector1 = rotated_rect_corner[0] - rotated_rect_corner[1];
 
 	// topLeft to topRight
 	const cv::Vec2f vector2 = rotated_rect_corner[2] - rotated_rect_corner[1];
@@ -62,7 +62,7 @@ cv::Vec2f Bar5::getBarDirectionVector() const {
 
 double Bar5::getAngleRadian() const {
 	// topLeft to bottomLeft
-	const cv::Vec2f vector1 = rotated_rect_corner[1] - rotated_rect_corner[0];
+	const cv::Vec2f vector1 = rotated_rect_corner[0] - rotated_rect_corner[1];
 
 	// topLeft to topRight
 	const cv::Vec2f vector2 = rotated_rect_corner[2] - rotated_rect_corner[1];

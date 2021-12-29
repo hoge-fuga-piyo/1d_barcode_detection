@@ -27,8 +27,8 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test15.jpg");
 	//cv::Mat image = cv::imread("../../../data/test16.jpg");
 	//cv::Mat image = cv::imread("../../../data/test17.jpg");
-	//cv::Mat image = cv::imread("../../../data/test18.jpg");
-	cv::Mat image = cv::imread("../../../data/test19.jpg");
+	cv::Mat image = cv::imread("../../../data/test18.jpg");
+	//cv::Mat image = cv::imread("../../../data/test19.jpg");
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 	//cv::Mat image = cv::imread("../../../data/test21.jpg");
 
