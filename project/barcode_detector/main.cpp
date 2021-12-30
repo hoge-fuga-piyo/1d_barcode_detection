@@ -27,18 +27,10 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test15.jpg");
 	//cv::Mat image = cv::imread("../../../data/test16.jpg");
 	//cv::Mat image = cv::imread("../../../data/test17.jpg");
-	cv::Mat image = cv::imread("../../../data/test18.jpg");
-	//cv::Mat image = cv::imread("../../../data/test19.jpg");
+	//cv::Mat image = cv::imread("../../../data/test18.jpg");
+	cv::Mat image = cv::imread("../../../data/test19.jpg");
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 	//cv::Mat image = cv::imread("../../../data/test21.jpg");
-
-	//cv::Mat image = cv::imread("../../../data/test20.jpg");
-	//cv::Mat image = cv::imread("../../../data/test13.jpg");
-	//cv::Mat image = cv::imread("../../../data/test14.jpg");
-
-	//cv::Mat image = cv::imread("../../../data/test18.jpg");
-
-	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 
 	const bool use_original_decoder = false;
 	const bool use_default_decoder = false;

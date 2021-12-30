@@ -158,11 +158,12 @@ std::vector<std::vector<Bar5>> BarcodeDetector5::removeOutlierPositionBars(const
 		const int cluster_num = 2;
 		const cv::TermCriteria criteria(cv::TermCriteria::EPS, 0, 0.01);
 		cv::Mat1i labels;
-		cv::Mat centroids;
-		cv::kmeans(bar_centers, cluster_num, labels, criteria, 1, cv::KMEANS_PP_CENTERS, centroids);
+		cv::Mat2d centroids;
+		cv::kmeans(bar_centers, cluster_num, labels, criteria, 5, cv::KMEANS_PP_CENTERS, centroids);
+		//cv::kmeans(bar_centers, cluster_num, labels, criteria, 1, cv::KMEANS_RANDOM_CENTERS, centroids);
 
-		cv::Point2f center1(centroids.row(0));
-		cv::Point2f center2(centroids.row(1));
+		cv::Point2f center1(centroids.at<double>(0, 0), centroids.at<double>(0, 1));
+		cv::Point2f center2(centroids.at<double>(1, 0), centroids.at<double>(1, 1));
 
 		// ƒNƒ‰ƒXƒ^‚²‚Æ‚É•ª‚¯‚é
 		std::vector<Bar5> bars_cluster0;
