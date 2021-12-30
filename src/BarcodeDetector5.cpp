@@ -5,7 +5,7 @@
 BarcodeDetector5::BarcodeDetector5(): min_barcode_bar_num(5) {}
 
 std::tuple<std::vector<cv::Rect>, std::vector<std::vector<cv::Point>>> BarcodeDetector5::detectMserRegions(const cv::Mat& gray_image) const {
-	cv::Ptr<cv::MSER> mser = cv::MSER::create();
+	cv::Ptr<cv::MSER> mser = cv::MSER::create(5, 60, 5000);
 	std::vector<std::vector<cv::Point>> regions;
 	std::vector<cv::Rect> mser_bbox;
 	mser->detectRegions(gray_image, regions, mser_bbox);
@@ -611,5 +611,4 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 		}
 		cv::imshow("barcode concat", draw_image);
 	}
-
 }
