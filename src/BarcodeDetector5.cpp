@@ -289,13 +289,13 @@ std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<
 		const cv::Vec2f vector2 = corner[2] - corner[1]; // topLeft to topRight
 
 		// 方向
-		const cv::Vec2f bar_vector = bars.at(i).at(0).getBarDirectionVector();
-		const double cos_theta1 = bar_vector.dot(vector1) / (cv::norm(bar_vector) * cv::norm(vector1));
+		const cv::Vec2f bar_vertical_vector = bars.at(i).at(0).getVerticalVector();
+		const double cos_theta1 = bar_vertical_vector.dot(vector1) / (cv::norm(bar_vertical_vector) * cv::norm(vector1));
 		double radian1 = std::acos(cos_theta1);
 		if (radian1 > M_PI / 2.0) {
 			radian1 = M_PI - radian1;
 		}
-		const double cos_theta2 = bar_vector.dot(vector2) / (cv::norm(bar_vector) * cv::norm(vector2));
+		const double cos_theta2 = bar_vertical_vector.dot(vector2) / (cv::norm(bar_vertical_vector) * cv::norm(vector2));
 		double radian2 = std::acos(cos_theta2);
 		if (radian2 > M_PI / 2.0) {
 			radian2 = M_PI - radian2;
@@ -324,42 +324,42 @@ std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<
 				continue;
 			}
 
-			//// バーコード同士の高さの差が一定以上なら結合しない
-			//const double large_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(i) : barcode_heights.at(j);
-			//const double short_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(j) : barcode_heights.at(i);
-			//if (short_height / large_height < 0.7) {
-			//	continue;
-			//}
+			// バーコード同士の高さの差が一定以上なら結合しない
+			const double large_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(i) : barcode_heights.at(j);
+			const double short_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(j) : barcode_heights.at(i);
+			if (short_height / large_height < 0.7) {
+				continue;
+			}
 
-			//// バーコード同士の角度の差が一定以上なら結合しない
-			//const double radian_threshold1 = 10.0 * (M_PI / 180.0);
-			//const cv::Vec2f vector1 = barcode_vectors.at(i);
-			//const cv::Vec2f vector2 = barcode_vectors.at(j);
-			//const double cos_theta = vector1.dot(vector2) / (cv::norm(vector1) * cv::norm(vector2));
-			//double radian = std::acos(cos_theta);
-			//if (radian > M_PI / 2.0) {
-			//	radian = M_PI - radian;
-			//}
-			//if (radian > radian_threshold1) {
-			//	continue;
-			//}
+			// バーコード同士の角度の差が一定以上なら結合しない
+			const double radian_threshold1 = 10.0 * (M_PI / 180.0);
+			const cv::Vec2f vector1 = barcode_vectors.at(i);
+			const cv::Vec2f vector2 = barcode_vectors.at(j);
+			const double cos_theta = vector1.dot(vector2) / (cv::norm(vector1) * cv::norm(vector2));
+			double radian = std::acos(cos_theta);
+			if (radian > M_PI / 2.0) {
+				radian = M_PI - radian;
+			}
+			if (radian > radian_threshold1) {
+				continue;
+			}
 
-			//// 片方のバーコードの中点からもう片方のバーコードの中点へのベクトルと、それぞれのバーコードの向きが一定以上異なれば結合しない
-			//const double radian_threshold2 = 10.0 * (M_PI / 180.0);
-			//const cv::Vec2f center2center = barcode_centers.at(j) - barcode_centers.at(i);
-			//const double cos_theta1 = center2center.dot(barcode_vectors.at(i)) / (cv::norm(center2center) * cv::norm(barcode_vectors.at(i)));
-			//double radian1 = std::acos(cos_theta1);
-			//if (radian1 > M_PI / 2.0) {
-			//	radian1 = M_PI - radian1;
-			//}
-			//const double cos_theta2 = center2center.dot(barcode_vectors.at(j)) / (cv::norm(center2center) * cv::norm(barcode_vectors.at(j)));
-			//double radian2 = std::acos(cos_theta2);
-			//if (radian2 > M_PI / 2.0) {
-			//	radian2 = M_PI - radian2;
-			//}
-			//if (radian1 > radian_threshold2 || radian2 > radian_threshold2) {
-			//	continue;
-			//}
+			// 片方のバーコードの中点からもう片方のバーコードの中点へのベクトルと、それぞれのバーコードの向きが一定以上異なれば結合しない
+			const double radian_threshold2 = 10.0 * (M_PI / 180.0);
+			const cv::Vec2f center2center = barcode_centers.at(j) - barcode_centers.at(i);
+			const double cos_theta1 = center2center.dot(barcode_vectors.at(i)) / (cv::norm(center2center) * cv::norm(barcode_vectors.at(i)));
+			double radian1 = std::acos(cos_theta1);
+			if (radian1 > M_PI / 2.0) {
+				radian1 = M_PI - radian1;
+			}
+			const double cos_theta2 = center2center.dot(barcode_vectors.at(j)) / (cv::norm(center2center) * cv::norm(barcode_vectors.at(j)));
+			double radian2 = std::acos(cos_theta2);
+			if (radian2 > M_PI / 2.0) {
+				radian2 = M_PI - radian2;
+			}
+			if (radian1 > radian_threshold2 || radian2 > radian_threshold2) {
+				continue;
+			}
 
 			// バーコードの領域が一定以上遠ければ結合しない
 			bool is_concat_target = false;
