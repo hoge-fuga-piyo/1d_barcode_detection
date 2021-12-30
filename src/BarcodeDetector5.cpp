@@ -1,7 +1,6 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include "BarcodeDetector5.h"
-#include <opencv2/flann.hpp>
 
 BarcodeDetector5::BarcodeDetector5(): min_barcode_bar_num(5) {}
 
@@ -328,7 +327,7 @@ std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<
 			//// バーコード同士の高さの差が一定以上なら結合しない
 			//const double large_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(i) : barcode_heights.at(j);
 			//const double short_height = barcode_heights.at(i) > barcode_heights.at(j) ? barcode_heights.at(j) : barcode_heights.at(i);
-			//if (short_height / large_height < 0.8) {
+			//if (short_height / large_height < 0.7) {
 			//	continue;
 			//}
 
@@ -367,7 +366,7 @@ std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<
 			for (const auto& bar1 : bars.at(i)) {
 				for (const auto& bar2 : bars.at(j)) {
 					const double distance = cv::norm(bar1.getCenter() - bar2.getCenter());
-					if (distance < 10.0) {
+					if (distance < 30.0) {
 						is_concat_target = true;
 						break;
 					}
@@ -379,9 +378,9 @@ std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<
 			}
 			
 			if (is_concat_target) {
-				if (concat_map.at(i) > 0) {
+				if (concat_map.at(i) >= 0) {
 					concat_map[j] = concat_map.at(i);
-				} else if (concat_map.at(j) > 0) {
+				} else if (concat_map.at(j) >= 0) {
 					concat_map[i] = concat_map.at(j);
 				} else {
 					concat_map[i] = new_barcode_index;
@@ -422,7 +421,12 @@ std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<
 	}
 
 	// TODO 矩形の導出は結合したバーコードのものだけに絞れば計算コストを抑えられそう
-	return mergeBars(new_clustered_bars);
+	std::vector<cv::RotatedRect> new_barcodes =  mergeBars(new_clustered_bars);
+	if (new_barcodes.size() == barcodes.size()) {
+		return new_barcodes;
+	}
+
+	return concatBarcodes(new_barcodes, new_clustered_bars);
 }
 
 void BarcodeDetector5::detect(const cv::Mat& image) const {
