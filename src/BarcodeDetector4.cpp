@@ -96,56 +96,56 @@ std::vector<std::array<cv::Point, 4>> BarcodeDetector4::barcodeRectDetection(con
 	for (const auto& contour : contours) {
 		cv::Rect barcode_rect = cv::boundingRect(contour);
 		cv::Point center = (barcode_rect.br() + barcode_rect.tl()) * 0.5;
-		cv::Point il = cv::Point(barcode_rect.tl().x, center.y);
-		cv::Point ir = cv::Point(barcode_rect.br().x, center.y);
+		cv::Point i_l = cv::Point(barcode_rect.tl().x, center.y);
+		cv::Point i_r = cv::Point(barcode_rect.br().x, center.y);
 		barcode_rects.push_back(barcode_rect);
 
 		cv::rectangle(draw_image, barcode_rect, cv::Scalar(0, 0, 255));
 		cv::circle(draw_image, center, 3, cv::Scalar(0, 255, 0), -1);
-		cv::circle(draw_image, il, 3, cv::Scalar(0, 255, 0), -1);
-		cv::circle(draw_image, ir, 3, cv::Scalar(0, 255, 0), -1);
+		cv::circle(draw_image, i_l, 3, cv::Scalar(0, 255, 0), -1);
+		cv::circle(draw_image, i_r, 3, cv::Scalar(0, 255, 0), -1);
 
 
 		// olÇÃì±èo
-		cv::Point ol = il;
+		cv::Point o_l = i_l;
 		const int rect_length_half = (barcode_rect.br().x - barcode_rect.tl().x) * 0.5;
-		double brightness_sum_ol = gray_image.at<uchar>(il.y, il.x);
+		double brightness_sum_ol = gray_image.at<uchar>(i_l.y, i_l.x);
 		int brightness_cnt_ol = 1;
-		const uchar il_brightness_value = gray_image.at<uchar>(il.y, il.x);
+		const uchar il_brightness_value = gray_image.at<uchar>(i_l.y, i_l.x);
 		for (int i = 1; i < rect_length_half; i++) {
-			const double weighted_avg_brightness = 0.85 * brightness_sum_ol / ((il.x + i) - il.x );
-			if (weighted_avg_brightness > gray_image.at<uchar>(il.y, il.x + i)) {
-				cv::circle(draw_image, cv::Point(il.x + i - 1, il.y), 3, cv::Scalar(125, 0, 125), -1);
-				ol = cv::Point(il.x + i - 1, il.y);
+			const double weighted_avg_brightness = 0.85 * brightness_sum_ol / ((i_l.x + i) - i_l.x );
+			if (weighted_avg_brightness > gray_image.at<uchar>(i_l.y, i_l.x + i)) {
+				cv::circle(draw_image, cv::Point(i_l.x + i - 1, i_l.y), 3, cv::Scalar(125, 0, 125), -1);
+				o_l = cv::Point(i_l.x + i - 1, i_l.y);
 				break;
 			}
 
-			brightness_sum_ol += gray_image.at<uchar>(il.y, il.x + i);
+			brightness_sum_ol += gray_image.at<uchar>(i_l.y, i_l.x + i);
 			brightness_cnt_ol++;
 		}
 
 		// orÇÃì±èo
-		cv::Point or = ir;
-		double brightness_sum_or = gray_image.at<uchar>(ir.y, ir.x);
+		cv::Point o_r = i_r;
+		double brightness_sum_or = gray_image.at<uchar>(i_r.y, i_r.x);
 		double brightness_cnt_or = 1;
-		const uchar ir_brightness_value = gray_image.at<uchar>(ir.y, il.x);
+		const uchar ir_brightness_value = gray_image.at<uchar>(i_r.y, i_l.x);
 		for (int i = 1; i < rect_length_half; i++) {
-			const double weighted_avg_brightness = 0.85 * brightness_sum_or / (ir.x - (ir.x - i));
-			if (weighted_avg_brightness > gray_image.at<uchar>(ir.y, ir.x - i)) {
-				cv::circle(draw_image, cv::Point(ir.x - i + 1, ir.y), 3, cv::Scalar(125, 0, 125), -1);
-				or = cv::Point(ir.x - i + 1, ir.y);
+			const double weighted_avg_brightness = 0.85 * brightness_sum_or / (i_r.x - (i_r.x - i));
+			if (weighted_avg_brightness > gray_image.at<uchar>(i_r.y, i_r.x - i)) {
+				cv::circle(draw_image, cv::Point(i_r.x - i + 1, i_r.y), 3, cv::Scalar(125, 0, 125), -1);
+				o_r = cv::Point(i_r.x - i + 1, i_r.y);
 				break;
 			}
 
-			brightness_sum_or += gray_image.at<uchar>(ir.y, ir.x - i);
+			brightness_sum_or += gray_image.at<uchar>(i_r.y, i_r.x - i);
 			brightness_cnt_or++;
 		}
 
 		std::array<cv::Point, 4> corners;
-		corners[0] = cv::Point(ol.x, barcode_rect.tl().y);
-		corners[1] = cv::Point(ol.x, barcode_rect.br().y);
-		corners[2] = cv::Point(or.x, barcode_rect.br().y);
-		corners[3] = cv::Point(or.x, barcode_rect.tl().y);
+		corners[0] = cv::Point(o_l.x, barcode_rect.tl().y);
+		corners[1] = cv::Point(o_l.x, barcode_rect.br().y);
+		corners[2] = cv::Point(o_r.x, barcode_rect.br().y);
+		corners[3] = cv::Point(o_r.x, barcode_rect.tl().y);
 		result_corners.push_back(corners);
 	}
 
@@ -160,15 +160,15 @@ double BarcodeDetector4::digitStartPoint(int digit_index, int barcode_start_poin
 	return o;
 }
 
-double BarcodeDetector4::base_width(const cv::Point& ol, const cv::Point& or ) const {
-	double w = (or.x - ol.x) / 95.0;
+double BarcodeDetector4::base_width(const cv::Point& o_l, const cv::Point& o_r) const {
+	double w = (o_r.x - o_l.x) / 95.0;
 	return w;
 }
 
 void BarcodeDetector4::decode(const std::array<cv::Point, 4>& corner) const {
 	const cv::Point center = (corner[0] + corner[2]) * 0.5;
-	const cv::Point ol = cv::Point(corner[0].x, center.y);
-	const cv::Point or = cv::Point(corner[2].x, center.y);
+	const cv::Point o_l = cv::Point(corner[0].x, center.y);
+	const cv::Point o_r = cv::Point(corner[2].x, center.y);
 
 	std::array<std::array<int, 7>, 10> m = {
 		std::array<int, 7>{1, 1, 1, -1, -1, 1, -1},	// m0
@@ -183,7 +183,7 @@ void BarcodeDetector4::decode(const std::array<cv::Point, 4>& corner) const {
 		std::array<int, 7>{1, 1, 1, -1, 1, -1, -1}
 	};
 
-	const double w = (or.x - ol.x) / 95.0;
+	const double w = (o_r.x - o_l.x) / 95.0;
 }
 
 std::vector<std::array<cv::Point, 4>> BarcodeDetector4::detect(const cv::Mat& image) const {
