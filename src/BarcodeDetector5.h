@@ -26,6 +26,8 @@ private:
 	std::vector<std::vector<Bar5>> removeInvalidBars(const std::vector<std::vector<Bar5>>& bars) const;
 	std::vector<cv::RotatedRect> mergeBars(const std::vector<std::vector<Bar5>>& bars) const;
 	std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> concatBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const;
+	std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> removeInvalidAspectRatioBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const;
+	std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> removeInvalidBarNumBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const;
 	std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> removeInvalidBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const;
 public:
 	BarcodeDetector5();

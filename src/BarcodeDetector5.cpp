@@ -470,7 +470,7 @@ std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> Barcode
 	return concatBarcodes(new_barcodes, new_clustered_bars);
 }
 
-std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> BarcodeDetector5::removeInvalidBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const {
+std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> BarcodeDetector5::removeInvalidAspectRatioBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const {
 	std::vector<cv::RotatedRect> dst_barcodes;
 	std::vector<std::vector<Bar5>> dst_bars;
 	for (size_t i = 0; i < barcodes.size(); i++) {
@@ -508,6 +508,26 @@ std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> Barcode
 	}
 
 	return std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>>(dst_barcodes, dst_bars);
+}
+
+std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> BarcodeDetector5::removeInvalidBarNumBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const {
+	std::vector<cv::RotatedRect> dst_barcodes;
+	std::vector<std::vector<Bar5>> dst_bars;
+	for (size_t i = 0; i < barcodes.size(); i++) {
+		if (bars.at(i).size () >= 10) {
+			dst_barcodes.push_back(barcodes.at(i));
+			dst_bars.push_back(bars.at(i));
+		}
+	}
+
+	return std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>>(dst_barcodes, dst_bars);
+}
+
+std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> BarcodeDetector5::removeInvalidBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const {
+	auto dst_barcodes_info = removeInvalidAspectRatioBarcodes(barcodes, bars);
+	dst_barcodes_info = removeInvalidBarNumBarcodes(std::get<0>(dst_barcodes_info), std::get<1>(dst_barcodes_info));
+
+	return dst_barcodes_info;
 }
 
 void BarcodeDetector5::detect(const cv::Mat& image) const {
@@ -714,6 +734,10 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 		cv::imshow("barcode concat", draw_image);
 	}
 
+	for(const auto& bars : clustered_bars) {
+		std::cout << "bar num: " << bars.size() << std::endl;
+	}
+
 	// バーコードっぽくないやつは削除する
 	start = std::chrono::system_clock::now();
 	const auto filtered_barcodes = removeInvalidBarcodes(barcode_rect, clustered_bars);
@@ -734,17 +758,17 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 			cv::line(draw_image, corner[2], corner[3], cv::Scalar(0, 0, 255), 2);
 			cv::line(draw_image, corner[3], corner[0], cv::Scalar(0, 0, 255), 2);
 		}
-		for (const auto& bars : clustered_bars) {
-			for (const auto& bar : bars) {
-				const cv::Rect rect = bar.getBox();
-				cv::rectangle(draw_image, rect, cv::Scalar(0, 255, 0));
+		//for (const auto& bars : clustered_bars) {
+		//	for (const auto& bar : bars) {
+		//		const cv::Rect rect = bar.getBox();
+		//		cv::rectangle(draw_image, rect, cv::Scalar(0, 255, 0));
 
-				const cv::Vec2f vertical_vec = bar.getVerticalVector();
-				const cv::Point2f start_point = bar.getCenter();
-				const cv::Point2f end_point = start_point + cv::Point2f(vertical_vec[0], vertical_vec[1]) * 20.0;
-				cv::line(draw_image, start_point, end_point, cv::Scalar(0, 255, 255));
-			}
-		}
+		//		const cv::Vec2f vertical_vec = bar.getVerticalVector();
+		//		const cv::Point2f start_point = bar.getCenter();
+		//		const cv::Point2f end_point = start_point + cv::Point2f(vertical_vec[0], vertical_vec[1]) * 20.0;
+		//		cv::line(draw_image, start_point, end_point, cv::Scalar(0, 255, 255));
+		//	}
+		//}
 
 		cv::imshow("filtered barcode", draw_image);
 	}
