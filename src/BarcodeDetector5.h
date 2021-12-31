@@ -16,6 +16,8 @@ private:
 	const int min_barcode_bar_num;
 
 	std::tuple<std::vector<cv::Rect>, std::vector<std::vector<cv::Point>>> detectMserRegions(const cv::Mat& gray_image) const;
+	std::vector<Bar5> removeInvalidAspectRatioRegions(const std::vector<Bar5>& bars) const;
+	std::vector<Bar5> uniqueSameAreaRegions(const std::vector<Bar5>& bars) const;
 	std::vector<Bar5> removeInvalidRegions(const std::vector<Bar5>& bars) const;
 	cv::Point2f conputeRepresentationPoint(const Bar5& bar) const;
 	std::vector<std::vector<Bar5>> clustering(const std::vector<Bar5>& bars) const;
@@ -23,7 +25,7 @@ private:
 	std::vector<std::vector<Bar5>> removeOutlierLengthBars(const std::vector<std::vector<Bar5>>& bars) const;
 	std::vector<std::vector<Bar5>> removeInvalidBars(const std::vector<std::vector<Bar5>>& bars) const;
 	std::vector<cv::RotatedRect> mergeBars(const std::vector<std::vector<Bar5>>& bars) const;
-	std::vector<cv::RotatedRect> concatBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const;
+	std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> concatBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const;
 public:
 	BarcodeDetector5();
 	void detect(const cv::Mat& image) const;

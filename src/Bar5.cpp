@@ -7,7 +7,9 @@ Bar5::Bar5(const cv::Rect& box, const std::vector<cv::Point>& region) {
 	this->region = region;
 
 	rotated_rect = cv::minAreaRect(region);
-	rotated_rect.points(rotated_rect_corner);
+	cv::Point2f corner[4];
+	rotated_rect.points(corner);
+	rotated_rect_corner = std::array<cv::Point2f, 4>{ corner[0], corner[1], corner[2], corner[3] };
 
 	cv::Size2f size = rotated_rect.size;
 	length = size.height > size.width ? size.height : size.width;
@@ -82,3 +84,6 @@ double Bar5::getLength() const {
 	return length;
 }
 
+std::array<cv::Point2f, 4> Bar5::getCorner() const {
+	return rotated_rect_corner;
+}

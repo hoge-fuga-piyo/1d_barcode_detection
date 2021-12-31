@@ -8,7 +8,7 @@ private:
 	cv::Rect box;
 	std::vector<cv::Point> region;
 	cv::RotatedRect rotated_rect;
-	cv::Point2f rotated_rect_corner[4];
+	std::array<cv::Point2f, 4> rotated_rect_corner;
 	double length;
 public:
 	Bar5(const cv::Rect& boxes, const std::vector<cv::Point>& regions);
@@ -21,6 +21,7 @@ public:
 	cv::Vec2f getBarDirectionVector() const;
 	double getAngleRadian() const;
 	double getLength() const;
+	std::array<cv::Point2f, 4> getCorner() const;
 };
 
 #endif

@@ -13,7 +13,7 @@ std::tuple<std::vector<cv::Rect>, std::vector<std::vector<cv::Point>>> BarcodeDe
 	return std::tuple<std::vector<cv::Rect>, std::vector<std::vector<cv::Point>>>(mser_bbox, regions);
 }
 
-std::vector<Bar5> BarcodeDetector5::removeInvalidRegions(const std::vector<Bar5>& bars) const {
+std::vector<Bar5> BarcodeDetector5::removeInvalidAspectRatioRegions(const std::vector<Bar5>& bars) const {
 	std::vector<Bar5> dst_bars;
 	for (const auto& bar : bars) {
 		const double aspect_ratio = bar.getAspectRatio();
@@ -25,6 +25,52 @@ std::vector<Bar5> BarcodeDetector5::removeInvalidRegions(const std::vector<Bar5>
 
 		dst_bars.push_back(bar);
 	}
+
+	return dst_bars;
+}
+
+std::vector<Bar5> BarcodeDetector5::uniqueSameAreaRegions(const std::vector<Bar5>& bars) const {
+	std::vector<Bar5> tmp_bars = bars;
+	std::sort(tmp_bars.begin(), tmp_bars.end(), [](const auto& bar1, const auto& bar2) {
+		return bar1.getLength() > bar2.getLength();
+	});
+
+	std::vector<bool> is_use_list(tmp_bars.size(), true);
+	const double distance_threshold = 1.0;
+	for (size_t i = 0; i < tmp_bars.size(); i++) {
+		const double length1 = tmp_bars.at(i).getLength();
+		const std::array<cv::Point2f, 4> corner1 = tmp_bars.at(i).getCorner();
+		for (size_t j = i + 1; j < tmp_bars.size(); j++) {
+			const double length2 = tmp_bars.at(j).getLength();
+			const std::array<cv::Point2f, 4> corner2 = tmp_bars.at(j).getCorner();
+			if (length2 / length1 < 0.95) {
+				break;
+			}
+
+			if (cv::norm(corner1[0] - corner2[0]) < distance_threshold
+				&& cv::norm(corner1[1] - corner2[1]) < distance_threshold
+				&& cv::norm(corner1[2] - corner2[2]) < distance_threshold
+				&& cv::norm(corner1[3] - corner2[3]) < distance_threshold) {
+				is_use_list[j] = false;
+			}
+		}
+	}
+
+	std::vector<Bar5> dst_bars;
+	for (size_t i = 0; i < is_use_list.size(); i++) {
+		if (is_use_list.at(i)) {
+			dst_bars.push_back(tmp_bars.at(i));
+		}
+	}
+
+	return dst_bars;
+}
+
+std::vector<Bar5> BarcodeDetector5::removeInvalidRegions(const std::vector<Bar5>& bars) const {
+	std::vector<Bar5> dst_bars = removeInvalidAspectRatioRegions(bars);
+
+	// 後続処理の計算量を減らすため、同じ領域を指していると思われるバーをユニークにする
+	dst_bars = uniqueSameAreaRegions(dst_bars);
 
 	return dst_bars;
 }
@@ -240,8 +286,6 @@ std::vector<std::vector<Bar5>> BarcodeDetector5::removeOutlierLengthBars(const s
 			std::vector<Bar5> bars1{ tmp_bars.begin(), tmp_bars.begin() + split_index + 1 };
 			std::vector<Bar5> bars2{ tmp_bars.begin() + split_index + 1, tmp_bars.end() };
 
-			//std::cout << "size: " << tmp_bars.size() << ", " << bars1.size() << ", " << bars2.size() << std::endl;
-
 			if (bars1.size() >= min_barcode_bar_num) {
 				dst_bars.push_back(bars1);
 			}
@@ -278,7 +322,7 @@ std::vector<cv::RotatedRect> BarcodeDetector5::mergeBars(const std::vector<std::
 	return barcode_rect;
 }
 
-std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const {
+std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> BarcodeDetector5::concatBarcodes(const std::vector<cv::RotatedRect>& barcodes, const std::vector<std::vector<Bar5>>& bars) const {
 	// バーコードの方向と高さと中心を導出
 	std::vector<cv::Vec2f> barcode_vectors;
 	std::vector<double> barcode_heights;
@@ -417,14 +461,10 @@ std::vector<cv::RotatedRect> BarcodeDetector5::concatBarcodes(const std::vector<
 		}
 	}
 
-	if (barcodes.size() == new_clustered_bars.size()) {	// 結合されたバーコードが存在しない
-		return barcodes;
-	}
-
 	// TODO 矩形の導出は結合したバーコードのものだけに絞れば計算コストを抑えられそう
 	std::vector<cv::RotatedRect> new_barcodes =  mergeBars(new_clustered_bars);
-	if (new_barcodes.size() == barcodes.size()) {
-		return new_barcodes;
+	if (new_clustered_bars.size() == bars.size()) {
+		return std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>>(new_barcodes, new_clustered_bars);
 	}
 
 	return concatBarcodes(new_barcodes, new_clustered_bars);
@@ -467,6 +507,15 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 		//}
 		cv::imshow("mser", draw_image);
 	}
+
+	//// 後続の処理時間を減らすため、同じ領域を示していると思われるものは1つに統一する
+	//start = std::chrono::system_clock::now();
+	//const auto& adjusted_bar_info = removeInvalidRegions(mser_bbox, mser_regions);
+	//mser_bbox = std::get<0>(adjusted_bar_info);
+	//mser_regions = std::get<1>(adjusted_bar_info);
+	//end = std::chrono::system_clock::now();
+	//std::cout << "remove invalid region: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
+	//std::cout << "MSER box num2: " << mser_bbox.size() << std::endl;
 	
 	// バーの構築
 	start = std::chrono::system_clock::now();
@@ -482,9 +531,20 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 	start = std::chrono::system_clock::now();
 	bars = removeInvalidRegions(bars);
 	end = std::chrono::system_clock::now();
-	std::cout << "remove invalid region: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
+	std::cout << "remove invalid region2: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 
 	std::cout << "MSER box num2: " << bars.size() << std::endl;
+
+	//std::vector<Bar5> tmp_bars = bars;
+	//std::sort(tmp_bars.begin(), tmp_bars.end(), [](const auto& bar1, const auto& bar2) {
+	//	return bar1.getRegion().size() < bar2.getRegion().size();
+	//});
+	//for(const auto& bar: tmp_bars) {
+	//	std::cout<< bar.getRegion().size()<< std::endl;
+	//	std::cout<< "[" << bar.getBox().x << ", " << bar.getBox().y << "] ";
+	//	std::cout<< "[" << bar.getBox().width << ", " << bar.getBox().height << "] " << std::endl;
+	//	std::cout<< "[" << (bar.getBox().x + bar.getBox().width) * 0.5 << ", " << (bar.getBox().y + bar.getBox().height) * 0.5 << "]" << std::endl;
+	//}
 
 	if (is_draw_image) {
 		cv::Mat draw_image = image.clone();
@@ -593,7 +653,9 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 
 	// バーコードを結合する
 	start = std::chrono::system_clock::now();
-	barcode_rect = concatBarcodes(barcode_rect, clustered_bars);
+	const auto concat_barcodes = concatBarcodes(barcode_rect, clustered_bars);
+	barcode_rect = std::get<0>(concat_barcodes);
+	clustered_bars = std::get<1>(concat_barcodes);
 	end = std::chrono::system_clock::now();
 	std::cout << "barcode concat: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " msec" << std::endl;
 	std::cout << "barcode num: " << barcode_rect.size() << std::endl;
