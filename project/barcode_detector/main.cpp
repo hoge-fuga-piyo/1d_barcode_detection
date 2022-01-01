@@ -9,6 +9,8 @@
 #include "BarcodeDetector5.h"
 #include "DefaultBarcodeDetector.h"
 
+#include "BarcodeDecoder.h"
+
 int main() {
 	//cv::Mat image = cv::imread("../../../data/test.jpg");
 	//cv::Mat image = cv::imread("../../../data/test2.jpg");
@@ -28,9 +30,12 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test16.jpg");
 	//cv::Mat image = cv::imread("../../../data/test17.jpg");
 	//cv::Mat image = cv::imread("../../../data/test18.jpg");
-	cv::Mat image = cv::imread("../../../data/test19.jpg");
+	//cv::Mat image = cv::imread("../../../data/test19.jpg");
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 	//cv::Mat image = cv::imread("../../../data/test21.jpg");
+	//cv::Mat image = cv::imread("../../../data/test22.jpg");
+	//cv::Mat image = cv::imread("../../../data/test23.jpg");	// ŒŸo‚Å‚«‚é‚æ‚¤‚É‚µ‚½‚¢
+	cv::Mat image = cv::imread("../../../data/test24.jpg");
 
 	const bool use_original_decoder = false;
 	const bool use_default_decoder = false;
@@ -151,8 +156,17 @@ int main() {
 
 	if (use_original_decoder5) {
 		BarcodeDetector5 detector;
-		detector.detect(image);
+		const auto& barcode_info = detector.detect(image);
+		if (barcode_info.size() > 0) {
+			std::cout << "Find barcodes: " << barcode_info.size() << std::endl;
+		} else {
+			std::cout << "Cannot find barcodes" << std::endl;
+		}
 
+		BarcodeDecoder decoder;
+		for (const auto& info : barcode_info) {
+			decoder.decode(image, std::get<0>(info), std::get<1>(info));
+		}
 	}
 
 	cv::waitKey(0);

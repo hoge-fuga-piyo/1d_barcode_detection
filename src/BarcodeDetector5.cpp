@@ -530,7 +530,7 @@ std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> Barcode
 	return dst_barcodes_info;
 }
 
-void BarcodeDetector5::detect(const cv::Mat& image) const {
+std::vector<std::tuple<std::array<cv::Point2f, 4>, cv::Vec2f>> BarcodeDetector5::detect(const cv::Mat& image) const {
 	bool is_draw_image = true;
 
 	cv::Mat gray_image;
@@ -772,4 +772,40 @@ void BarcodeDetector5::detect(const cv::Mat& image) const {
 
 		cv::imshow("filtered barcode", draw_image);
 	}
+
+	// バーコードのコーナーと向きを返す
+	std::vector<std::tuple<std::array<cv::Point2f, 4>, cv::Vec2f>> results;
+	for (size_t i = 0; i < barcode_rect.size(); i++) {
+		// コーナー
+		cv::Point2f corner[4];
+		barcode_rect[i].points(corner);
+		std::array<cv::Point2f, 4> corner_arr{
+			corner[0],
+			corner[1],
+			corner[2],
+			corner[3]
+		};
+
+		// 向き
+		const cv::Vec2f vector1 = corner[0] - corner[1]; // topLeft to bottomLeft
+		const cv::Vec2f vector2 = corner[2] - corner[1]; // topLeft to topRight
+
+		const cv::Vec2f bar_vertical_vector = clustered_bars.at(i).at(0).getVerticalVector();
+		const double cos_theta1 = bar_vertical_vector.dot(vector1) / (cv::norm(bar_vertical_vector) * cv::norm(vector1));
+		double radian1 = std::acos(cos_theta1);
+		if (radian1 > M_PI / 2.0) {
+			radian1 = M_PI - radian1;
+		}
+		const double cos_theta2 = bar_vertical_vector.dot(vector2) / (cv::norm(bar_vertical_vector) * cv::norm(vector2));
+		double radian2 = std::acos(cos_theta2);
+		if (radian2 > M_PI / 2.0) {
+			radian2 = M_PI - radian2;
+		}
+
+		const cv::Vec2f barcode_vector = radian1 > radian2 ? vector2 : vector1;
+
+		results.push_back(std::tuple<std::array<cv::Point2f, 4>, cv::Vec2f>(corner_arr, barcode_vector));
+	}
+
+	return results;
 }
