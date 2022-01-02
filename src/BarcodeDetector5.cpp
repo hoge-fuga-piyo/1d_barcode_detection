@@ -531,7 +531,7 @@ std::tuple<std::vector<cv::RotatedRect>, std::vector<std::vector<Bar5>>> Barcode
 }
 
 std::vector<std::tuple<std::array<cv::Point2f, 4>, cv::Vec2f>> BarcodeDetector5::detect(const cv::Mat& image) const {
-	bool is_draw_image = true;
+	bool is_draw_image = false;
 
 	cv::Mat gray_image;
 	cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);

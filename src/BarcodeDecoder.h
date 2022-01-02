@@ -6,9 +6,9 @@
 class BarcodeDecoder {
 private:
     std::array<cv::Point2f, 4> getWithQuietZone(const std::array<cv::Point2f, 4>& corner, const cv::Vec2f& direction) const;
-
+    cv::Mat cropBarcodeArea(const cv::Mat& image, const std::array<cv::Point2f, 4>& corner, const cv::Vec2f& direction) const;
 public:
-    std::string decode(const cv::Mat& image, const std::array<cv::Point2f, 4>& corners, const cv::Vec2f& direction) const;
+    std::string decode(const cv::Mat& image, const std::array<cv::Point2f, 4>& corner, const cv::Vec2f& direction) const;
 };
 
 #endif

@@ -33,9 +33,11 @@ int main() {
 	//cv::Mat image = cv::imread("../../../data/test19.jpg");
 	//cv::Mat image = cv::imread("../../../data/test20.jpg");
 	//cv::Mat image = cv::imread("../../../data/test21.jpg");
-	//cv::Mat image = cv::imread("../../../data/test22.jpg");
+	cv::Mat image = cv::imread("../../../data/test22.jpg");
 	//cv::Mat image = cv::imread("../../../data/test23.jpg");	// ŒŸo‚Å‚«‚é‚æ‚¤‚É‚µ‚½‚¢
-	cv::Mat image = cv::imread("../../../data/test24.jpg");
+	//cv::Mat image = cv::imread("../../../data/test24.jpg");
+	//cv::Mat image = cv::imread("../../../data/test25.jpg");
+	//cv::Mat image = cv::imread("../../../data/test26.jpg");
 
 	const bool use_original_decoder = false;
 	const bool use_default_decoder = false;
