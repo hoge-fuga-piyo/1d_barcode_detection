@@ -32,7 +32,6 @@ std::array<cv::Point2f, 4> BarcodeDecoder::getWithQuietZone(const cv::Size& imag
 
     std::array<cv::Point2f, 4> dst_corner;
     if (radian1 < radian2) {
-        std::cout<<"radian1"<<std::endl;
         const double unit_pixel = cv::norm(vector1) / 95.0; // EAN13は95モジュールからなるので、1モジュールあたりの長さを求める
         cv::Vec2f unit_vector = vector1 / cv::norm(vector1);
         if (is_reverse1) {
@@ -98,7 +97,6 @@ std::array<cv::Point2f, 4> BarcodeDecoder::getWithQuietZone(const cv::Size& imag
             dst_corner[2] = dst_corner[2] + cv::Point2f(shift_vector);
         }
     } else {
-        std::cout<<"radian2"<<std::endl;
         const double unit_pixel = cv::norm(vector2) / 95.0; // EAN13は95モジュールからなるので、1モジュールあたりの長さを求める
         cv::Vec2f unit_vector = vector2 / cv::norm(vector2);
         if (is_reverse2) {
@@ -198,11 +196,7 @@ cv::Mat BarcodeDecoder::cropBarcodeArea(const cv::Mat& image, const std::array<c
     }
 
     // 回転させてもバーコードが途切れないように余白を埋める
-    const double length1 = cv::norm(corner[0] - corner[1]);
-    const double length2 = cv::norm(corner[2] - corner[1]);
-    const double barcode_length = length1 > length2 ? length1 : length2;
-    const double image_length = barcode_image.cols > barcode_image.rows ? barcode_image.cols : barcode_image.rows;
-    double length = barcode_length > image_length ? barcode_length + 1.0 : image_length + 1.0;
+    const double length = cv::norm(cv::Point(barcode_image.cols, barcode_image.rows));
 
     cv::Mat barcode_image_with_margin = cv::Mat::zeros(length, length, image.type());
     const int x_margin = (barcode_image_with_margin.cols - barcode_image.cols) / 2.0;
@@ -212,7 +206,6 @@ cv::Mat BarcodeDecoder::cropBarcodeArea(const cv::Mat& image, const std::array<c
         dst_corner[i] = dst_corner[i] + cv::Point2f(x_margin, y_margin);
     }
 
-    std::cout << "access1_2" <<std::endl;
     //cv::line(barcode_image_with_margin, dst_corner[0], dst_corner[1], cv::Scalar(0, 0, 255), 2);
     //cv::line(barcode_image_with_margin, dst_corner[1], dst_corner[2], cv::Scalar(0, 0, 255), 2);
     //cv::line(barcode_image_with_margin, dst_corner[2], dst_corner[3], cv::Scalar(0, 0, 255), 2);
@@ -233,8 +226,6 @@ cv::Mat BarcodeDecoder::cropBarcodeArea(const cv::Mat& image, const std::array<c
     const cv::Mat affine_mat = cv::getRotationMatrix2D(image_center, rotation_angle_degree, 1.0);
     cv::Mat rotated_image;
     cv::warpAffine(barcode_image_with_margin, rotated_image, affine_mat, barcode_image_with_margin.size());
-
-    std::cout << "access1_3" <<std::endl;
 
     // バーコード部分のみ抽出
     const cv::Matx22f rotation_mat(std::cos(rotation_angle_radian), -std::sin(rotation_angle_radian)
@@ -268,65 +259,9 @@ cv::Mat BarcodeDecoder::cropBarcodeArea(const cv::Mat& image, const std::array<c
         }
     }
 
-    //if (min_x < 0.0) {
-    //    min_x = 0.0;
-    //}
-    //if (min_y < 0.0) {
-    //    min_y = 0.0;
-    //}
-
-    std::cout << rotated_image.size() << std::endl;
-    std::cout << min_x << ", " << min_y << ", " << max_x << ", " << max_y << std::endl;
-
     const cv::Mat result_image = rotated_image(cv::Rect(cv::Point(min_x, min_y), cv::Size(max_x - min_x, max_y - min_y))).clone();
 
     return result_image;
-}
-
-cv::Mat BarcodeDecoder::binalize(const cv::Mat& gray_image) const {
-
-    int block_size = gray_image.cols > gray_image.rows ? gray_image.cols / 2 : gray_image.rows / 2;
-    if (block_size % 2 == 0) {
-        block_size--;
-    }
-
-    cv::Mat binary_image;
-    cv::threshold(gray_image, binary_image, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
-    //cv::adaptiveThreshold(gray_image, binary_image, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 7, 3);
-    //cv::adaptiveThreshold(gray_image, binary_image, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, block_size, 3);
-    //cv::adaptiveThreshold(gray_image, binary_image, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, 11, 3);
-
-    //cv::Mat clahe_image;
-    //cv::Ptr<cv::CLAHE> clahe = cv::createCLAHE(4.0, cv::Size(8,8));
-    //clahe->apply(gray_image, clahe_image);
-    //cv::imshow("clahe", clahe_image);
-
-    //const uchar threshold = 20;
-    //cv::Mat binary_image = gray_image.clone();
-    //uchar prev_brightness_value = gray_image.at<uchar>(gray_image.rows / 2, 0);
-    //int cols = 1;
-    //for (int x = 1; x < clahe_image.cols; x++) {
-    //    uchar brightness_value = gray_image.at<uchar>(gray_image.rows / 2, x);
-    //    std::cout<<(int)brightness_value<<std::endl;
-    //    //std::cout << (int)gray_image.at<uchar>(gray_image.rows / 2, x) << std::endl;
-    //    if (std::abs(prev_brightness_value - brightness_value) > threshold) {
-    //        if (prev_brightness_value > brightness_value) {
-    //            const cv::Mat white(gray_image.rows, cols, CV_8UC1, cv::Scalar(255));
-    //            //cv::imshow("white", white);
-    //            //cv::waitKey(0);
-    //            white.copyTo(binary_image(cv::Rect(cv::Point(x - cols, 0), cv::Size(cols, gray_image.rows))));
-    //        } else {
-    //            const cv::Mat black(gray_image.rows, cols, CV_8UC1, cv::Scalar(0));
-    //            black.copyTo(binary_image(cv::Rect(cv::Point(x - cols, 0), cv::Size(cols, gray_image.rows))));
-    //        }
-    //        cols = 1;
-    //    } else {
-    //        cols++;
-    //    }
-    //    prev_brightness_value = brightness_value;
-    //}
-
-    return binary_image;
 }
 
 std::string BarcodeDecoder::decode(const cv::Mat& image, const std::array<cv::Point2f, 4>& corner, const cv::Vec2f& direction) const {
@@ -346,8 +281,6 @@ std::string BarcodeDecoder::decode(const cv::Mat& image, const std::array<cv::Po
         cv::imshow("quiet zone", draw_image);
     }
 
-    std::cout << "access1" <<std::endl;
-
     // バーコードの領域をx軸に並行な状態に回転する
     cv::Mat gray_image;
     cv::cvtColor(image, gray_image, cv::COLOR_BGR2GRAY);
@@ -357,31 +290,57 @@ std::string BarcodeDecoder::decode(const cv::Mat& image, const std::array<cv::Po
         cv::imshow("barcode_area", barcode_image);
     }
 
-    std::cout << "access2" <<std::endl;
-
-    // 画像の二値化
-    const cv::Mat binary_image = binalize(barcode_image);
-
-    if (is_draw_image) {
-        cv::imshow("binalize barcode", binary_image);
-    }
-
     // デコード
     std::vector<std::string> decoded_info;
     std::vector<cv::barcode::BarcodeType> decoded_type;
     cv::barcode::BarcodeDetector detector;
     std::vector<cv::Point2f> corners {
-        cv::Point2f(0, binary_image.rows - 1),
+        cv::Point2f(0, barcode_image.rows - 1),
         cv::Point2f(0, 0),
-        cv::Point2f(binary_image.cols - 1, 0),
-        cv::Point2f(binary_image.cols - 1, binary_image.rows - 1)
+        cv::Point2f(barcode_image.cols - 1, 0),
+        cv::Point2f(barcode_image.cols - 1, barcode_image.rows - 1)
     };
-    //detector.decode(binary_image, corners, decoded_info, decoded_type);
     detector.decode(barcode_image, corners, decoded_info, decoded_type);
 
-    for (const auto& tmp: decoded_info) {
-        std::cout<<tmp<<std::endl;
+    for (auto tmp : decoded_info) {
+        std::cout << tmp << std::endl;
     }
+
+    //// デコードが失敗した場合は、二値化の結果スキャンライン上のガードバーがくっついてしまっているパターンの場合があるので、スキャンラインをずらして再実行
+    //bool is_failure = true;
+    //for (const auto& str : decoded_info) {
+    //    if (str != "") {
+    //        is_failure = false;
+    //    }
+    //}
+    //if (is_failure) {
+    //    corners = std::vector<cv::Point2f>{
+    //        cv::Point2f(0, (barcode_image.rows - 1) * (1.0/2.0)),
+    //        cv::Point2f(0, 0),
+    //        cv::Point2f(barcode_image.cols - 1, 0),
+    //        cv::Point2f(barcode_image.cols - 1, (barcode_image.rows - 1) * (1.0/2.0))
+    //        //cv::Point2f(0, barcode_image.rows - 1),
+    //        //cv::Point2f(0, barcode_image.rows * 1.0 / 3.0),
+    //        //cv::Point2f(barcode_image.cols - 1, barcode_image.rows * 1.0 / 3.0),
+    //        //cv::Point2f(barcode_image.cols - 1, barcode_image.rows - 1)
+    //    };
+    //    decoded_info.clear();
+    //    decoded_type.clear();
+    //    detector.decode(barcode_image, corners, decoded_info, decoded_type);
+
+    //    std::cout << "2nd try" << std::endl;
+    //    for (auto tmp : decoded_info) {
+    //        std::cout << tmp << std::endl;
+    //    }
+
+    //    cv::Mat tmp_image = barcode_image.clone();
+    //    cv::line(tmp_image, corners[0], corners[1], cv::Scalar(0, 0, 255), 2);
+    //    cv::line(tmp_image, corners[1], corners[2], cv::Scalar(0, 0, 255), 2);
+    //    cv::line(tmp_image, corners[2], corners[3], cv::Scalar(0, 0, 255), 2);
+    //    cv::line(tmp_image, corners[3], corners[0], cv::Scalar(0, 0, 255), 2);
+    //    cv::imshow("tmp_barcode", barcode_image);
+
+    //}
 
     return "";
 }
