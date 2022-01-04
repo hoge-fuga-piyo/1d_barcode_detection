@@ -225,7 +225,7 @@ cv::Mat BarcodeDecoder::cropBarcodeArea(const cv::Mat& image, const std::array<c
     const cv::Size2f image_center(barcode_image_with_margin.size().width * 0.5, barcode_image_with_margin.size().height * 0.5);
     const cv::Mat affine_mat = cv::getRotationMatrix2D(image_center, rotation_angle_degree, 1.0);
     cv::Mat rotated_image;
-    cv::warpAffine(barcode_image_with_margin, rotated_image, affine_mat, barcode_image_with_margin.size());
+    cv::warpAffine(barcode_image_with_margin, rotated_image, affine_mat, barcode_image_with_margin.size(), cv::INTER_CUBIC);
 
     // バーコード部分のみ抽出
     const cv::Matx22f rotation_mat(std::cos(rotation_angle_radian), -std::sin(rotation_angle_radian)
@@ -339,7 +339,6 @@ std::string BarcodeDecoder::decode(const cv::Mat& image, const std::array<cv::Po
     //    cv::line(tmp_image, corners[2], corners[3], cv::Scalar(0, 0, 255), 2);
     //    cv::line(tmp_image, corners[3], corners[0], cv::Scalar(0, 0, 255), 2);
     //    cv::imshow("tmp_barcode", barcode_image);
-
     //}
 
     return "";
